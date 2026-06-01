@@ -36,8 +36,24 @@ class HColors {
   static const secondaryContainer = Color(0xFFFE8C65);
   static const onSecondaryContainer = Color(0xFF742405);
 
-  static const tertiary = Color(0xFF8F4B3A);
+  static const tertiary = Color(0xFF735C00);
   static const onTertiary = Color(0xFFFFFFFF);
-  static const tertiaryContainer = Color(0xFFF39D88);
-  static const onTertiaryContainer = Color(0xFF703323);
+  static const tertiaryContainer = Color(0xFFCCA72F);
+  static const onTertiaryContainer = Color(0xFF4E3D00);
+
+  static const tertiaryFixed = Color(0xFFFFE088);
+  static const tertiaryFixedDim = Color(0xFFE9C349);
+  static const onTertiaryFixed = Color(0xFF241A00);
+  static const onTertiaryFixedVariant = Color(0xFF574500);
+
+  static const secondaryFixed = Color(0xFFFFDBD0);
+  static const secondaryFixedDim = Color(0xFFFFB59D);
+  static const onSecondaryFixed = Color(0xFF390C00);
+  static const onSecondaryFixedVariant = Color(0xFF7E2C0B);
+
+  static const onPrimaryFixed = Color(0xFF231B00);
+  static const onPrimaryFixedVariant = Color(0xFF574500);
+
+  static const inverseSurface = Color(0xFF303030);
+  static const inverseOnSurface = Color(0xFFF2F0F0);
 }
