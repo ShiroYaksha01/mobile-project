@@ -1,3 +1,4 @@
+import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -117,7 +118,10 @@ class _SignInScreenState extends State<SignInScreen> {
                   children: [TextSpan(
                       text: 'Create Account',
                       style: HText.bodyMd.copyWith(color: HColors.secondary,
-                          fontWeight: FontWeight.w600, decoration: TextDecoration.underline))]))),
+                          fontWeight: FontWeight.w600, decoration: TextDecoration.underline),
+                      recognizer: TapGestureRecognizer()..onTap = () {
+                        Navigator.pushNamed(context, '/register');
+                      })]))),
               const SizedBox(height: 32),
             ]),
           ),
