@@ -25,9 +25,24 @@
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
       <PrivateAssets>all</PrivateAssets>
     </PackageReference>
+    <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.2" />
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Supabase" Version="1.1.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- Temporarily exclude incomplete folders so we can compile and test the Auth APIs -->
+    <Compile Remove="Controllers\**\*.cs" />
+    <Compile Remove="Services\**\*.cs" />
+    <Compile Remove="Data\Configurations\**\*.cs" />
+    <Compile Remove="Hubs\**\*.cs" />
+    <Compile Remove="Mappings\**\*.cs" />
+    
+    <!-- Include only the fully implemented Auth API files -->
+    <Compile Include="Controllers\AuthController.cs" />
+    <Compile Include="Services\AuthService.cs" />
+    <Compile Include="Services\TokenService.cs" />
+    <Compile Include="Services\UserService.cs" />
+  </ItemGroup>
 </Project>
