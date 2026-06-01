@@ -79,7 +79,14 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: HeritageBottomNav(
         currentIndex: _navIndex,
-        onTap: (i) => setState(() => _navIndex = i),
+        onTap: (i) {
+          setState(() => _navIndex = i);
+          if (i == 1) {
+            Navigator.pushNamed(context, '/shop');
+          } else if (i == 0) {
+            Navigator.pushNamed(context, '/home');
+          }
+        },
       ),
       body: CustomScrollView(
         slivers: [
@@ -426,7 +433,9 @@ class _HeroSection extends StatelessWidget {
                   ),
                   const SizedBox(height: 18),
                   ElevatedButton(
-                    onPressed: () {},
+                    onPressed: () {
+                      Navigator.pushNamed(context, '/shop');
+                    },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: HColors.primaryContainer,
                       foregroundColor: HColors.onPrimaryContainer,
