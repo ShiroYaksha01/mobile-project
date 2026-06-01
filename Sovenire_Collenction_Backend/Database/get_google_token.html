@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Get Google ID Token</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 60px auto; padding: 20px; background: #f5f5f5; }
+    button { padding: 12px 24px; font-size: 16px; background: #4285F4; color: white; border: none; border-radius: 6px; cursor: pointer; }
+    button:hover { background: #357ABD; }
+    textarea { width: 100%; height: 120px; margin-top: 16px; padding: 10px; font-size: 12px; border-radius: 6px; border: 1px solid #ccc; }
+    .label { font-weight: bold; margin-top: 20px; display: block; }
+    .note { color: #888; font-size: 13px; margin-top: 8px; }
+  </style>
+</head>
+<body>
+  <h2>🔑 Get Google ID Token for Postman Testing</h2>
+  <p>Click the button below to sign in with Google. Your <code>id_token</code> will appear — copy it into Postman.</p>
+
+  <!--
+    STEP 1: Replace YOUR_GOOGLE_CLIENT_ID below with your actual Client ID
+    from Google Cloud Console → APIs & Services → Credentials → OAuth 2.0 Client IDs
+    Set Authorized JavaScript origins to: http://localhost (or wherever you open this file)
+  -->
+  <button onclick="signIn()">Sign in with Google</button>
+
+  <span class="label">Your Google ID Token (copy this into Postman):</span>
+  <textarea id="token" placeholder="Your id_token will appear here after sign-in..." readonly></textarea>
+  <p class="note">⏱ Token expires in ~1 hour. If Postman returns 401, click sign in again.</p>
+
+  <!-- Google Identity Services SDK -->
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <script>
+    const CLIENT_ID = 'YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com'; // ← Replace this!
+
+    function signIn() {
+      google.accounts.id.initialize({
+        client_id: CLIENT_ID,
+        callback: handleCredentialResponse,
+        auto_select: false,
+      });
+      google.accounts.id.prompt(); // shows One Tap
+    }
+
+    function handleCredentialResponse(response) {
+      const idToken = response.credential;
+      document.getElementById('token').value = idToken;
+
+      // Decode and show email from the token
+      const payload = JSON.parse(atob(idToken.split('.')[1]));
+      alert('Signed in as: ' + payload.email + '\n\nID Token copied to the box below!');
+    }
+  </script>
+</body>
+</html>

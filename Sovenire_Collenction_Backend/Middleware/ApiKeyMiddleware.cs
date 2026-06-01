@@ -8,8 +8,6 @@ namespace Sovenire_Collenction_Backend.Middleware
         {
             Console.WriteLine($" {context.Request.Method} {context.Request.Path}");
             await _next(context);
-            Console.WriteLine($" Response: {context.Response.StatusCode}");
         }
-        await _next(context);
     }
 }
