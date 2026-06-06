@@ -44,12 +44,16 @@ class HeritageAppBar extends StatelessWidget
             onPressed: onSearch,
             icon: const Icon(Icons.search, color: HColors.primary),
           ),
-        IconButton(
-          onPressed: onMenu,
-          icon: const Icon(
-            Icons.menu,
-            color: HColors.primary,
-          ),
+        Builder(
+          builder: (context) {
+            return IconButton(
+              onPressed: onMenu ?? () => Scaffold.of(context).openEndDrawer(),
+              icon: const Icon(
+                Icons.menu,
+                color: HColors.primary,
+              ),
+            );
+          },
         ),
       ],
     );
