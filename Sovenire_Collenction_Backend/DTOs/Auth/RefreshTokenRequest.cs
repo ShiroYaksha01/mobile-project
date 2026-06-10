@@ -1,3 +1,5 @@
+using System.ComponentModel.DataAnnotations;
+
 namespace Sovenire_Collenction_Backend.DTOs.Auth
 {
     public class RefreshTokenRequest
