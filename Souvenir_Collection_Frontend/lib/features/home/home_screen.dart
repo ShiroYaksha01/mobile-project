@@ -8,10 +8,12 @@ import '../../core/widgets/app_bar.dart';
 import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/category_chip.dart';
 import '../../core/widgets/product_card.dart';
+import '../../core/widgets/sidebar.dart';
 import '../../data/static_data.dart';
 import '../../models/artisan.dart';
 import '../../models/nearby_shop.dart';
 import '../../models/product.dart';
+import '../../services/product_service.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<Product> products;
@@ -77,15 +79,17 @@ class _HomeScreenState extends State<HomeScreen> {
           });
         },
       ),
+      endDrawer: const AppSidebar(currentIndex: -1),
       bottomNavigationBar: HeritageBottomNav(
         currentIndex: _navIndex,
+        cartCount: ProductService.cartCount,
         onTap: (i) {
-          setState(() => _navIndex = i);
-          if (i == 1) {
-            Navigator.pushNamed(context, '/shop');
-          } else if (i == 0) {
-            Navigator.pushNamed(context, '/home');
-          }
+          if (i == _navIndex) return;
+          if (i == 0) Navigator.pushReplacementNamed(context, '/home');
+          if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
+          if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
+          if (i == 3) Navigator.pushReplacementNamed(context, '/cart');
+          if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
         },
       ),
       body: CustomScrollView(
@@ -224,8 +228,22 @@ class _HomeScreenState extends State<HomeScreen> {
               badge: p.badge,
               isFavorite: p.isFavorite,
               category: p.category,
-              onFavoriteToggle: () => widget.onFavoriteToggle(p),
-              onAddToCart: () => widget.onAddToCart(p),
+              onFavoriteToggle: () {
+                setState(() {
+                  widget.onFavoriteToggle(p);
+                });
+              },
+              onAddToCart: () {
+                setState(() {
+                  widget.onAddToCart(p);
+                });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('${p.name} added to cart'),
+                    duration: const Duration(seconds: 2),
+                  ),
+                );
+              },
             ),
           );
         },

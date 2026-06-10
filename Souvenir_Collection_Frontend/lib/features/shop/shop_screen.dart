@@ -1,9 +1,13 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
+import '../../core/widgets/app_bar.dart';
 import '../../core/widgets/bottom_nav.dart';
+import '../../core/widgets/product_card.dart';
+import '../../core/widgets/sidebar.dart';
 import '../../models/product.dart';
 import '../../data/static_data.dart';
+import '../../services/product_service.dart';
 
 class ShopScreen extends StatefulWidget {
   final List<Product> products;
@@ -63,7 +67,8 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
       length: 3,
       child: Scaffold(
         backgroundColor: HColors.background,
-        appBar: _buildAppBar(),
+        appBar: const HeritageAppBar(),
+        endDrawer: const AppSidebar(currentIndex: -1),
         body: Column(
           children: [
             // Search Bar
@@ -81,7 +86,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                   hintStyle: HText.bodyMd.copyWith(
                     color: HColors.onSurfaceVariant,
                   ),
-                  prefixIcon: Icon(
+                  prefixIcon: const Icon(
                     Icons.search,
                     color: HColors.onSurfaceVariant,
                   ),
@@ -134,46 +139,18 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         ),
         bottomNavigationBar: HeritageBottomNav(
           currentIndex: _navIndex,
+          cartCount: ProductService.cartCount,
           onTap: (i) {
-            setState(() => _navIndex = i);
-            if (i == 1) {
-              Navigator.pushNamed(context, '/shop');
-            } else if (i == 0) {
-              Navigator.pushNamed(context, '/home');
-            }
+            if (i == _navIndex) return;
+            if (i == 0) Navigator.pushReplacementNamed(context, '/home');
+            if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
+            if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
+            if (i == 3) Navigator.pushReplacementNamed(context, '/cart');
+            if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
           },
         ),
         floatingActionButton: _buildFilterFAB(),
       ),
-    );
-  }
-
-  PreferredSizeWidget _buildAppBar() {
-    return AppBar(
-      backgroundColor: HColors.surface,
-      elevation: 0,
-      leading: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Icon(
-          Icons.spa_outlined,
-          color: HColors.primary,
-        ),
-      ),
-      title: Text(
-        'Crafted in Cambodia',
-        style: HText.headlineMd.copyWith(
-          color: HColors.primary,
-        ),
-      ),
-      actions: [
-        Padding(
-          padding: const EdgeInsets.all(16),
-          child: Icon(
-            Icons.menu,
-            color: HColors.primary,
-          ),
-        ),
-      ],
     );
   }
 
@@ -230,12 +207,40 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 : ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _filteredProducts.take(2).length,
+                    itemCount: _filteredProducts.take(3).length,
                     itemBuilder: (context, index) {
                       final product = _filteredProducts[index];
                       return Padding(
                         padding: const EdgeInsets.only(right: 16),
-                        child: _buildFeaturedProductCard(product),
+                        child: SizedBox(
+                          width: 200,
+                          child: ProductCard(
+                            id: product.id,
+                            name: product.name,
+                            subtitle: product.subtitle,
+                            imageUrl: product.imageUrl,
+                            price: product.price,
+                            badge: product.badge,
+                            isFavorite: product.isFavorite,
+                            category: product.category,
+                            onFavoriteToggle: () {
+                              setState(() {
+                                widget.onFavoriteToggle(product);
+                              });
+                            },
+                            onAddToCart: () {
+                              setState(() {
+                                widget.onAddToCart(product);
+                              });
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('${product.name} added to cart'),
+                                  duration: const Duration(seconds: 2),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
                       );
                     },
                   ),
@@ -251,201 +256,41 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 crossAxisCount: 2,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
-                childAspectRatio: 0.7,
+                childAspectRatio: 0.62,
               ),
               itemCount: _filteredProducts.length,
               itemBuilder: (context, index) {
                 final product = _filteredProducts[index];
-                return _buildProductCard(product);
+                return ProductCard(
+                  id: product.id,
+                  name: product.name,
+                  subtitle: product.subtitle,
+                  imageUrl: product.imageUrl,
+                  price: product.price,
+                  badge: product.badge,
+                  isFavorite: product.isFavorite,
+                  category: product.category,
+                  onFavoriteToggle: () {
+                    setState(() {
+                      widget.onFavoriteToggle(product);
+                    });
+                  },
+                  onAddToCart: () {
+                    setState(() {
+                      widget.onAddToCart(product);
+                    });
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('${product.name} added to cart'),
+                        duration: const Duration(seconds: 2),
+                      ),
+                    );
+                  },
+                );
               },
             ),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildFeaturedProductCard(Product product) {
-    return Container(
-      width: 280,
-      decoration: BoxDecoration(
-        color: HColors.surface,
-        borderRadius: BorderRadius.circular(16),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.06),
-            blurRadius: 20,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            height: 180,
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(16),
-                topRight: Radius.circular(16),
-              ),
-              color: HColors.surfaceContainerLowest,
-            ),
-            child: Stack(
-              fit: StackFit.expand,
-              children: [
-                Image.network(
-                  product.imageUrl,
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: HColors.surfaceContainerLow,
-                      child: const Icon(Icons.image_not_supported),
-                    );
-                  },
-                ),
-                Positioned(
-                  top: 12,
-                  right: 12,
-                  child: GestureDetector(
-                    onTap: () => widget.onFavoriteToggle(product),
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: HColors.background.withOpacity(0.8),
-                        shape: BoxShape.circle,
-                      ),
-                      child: Icon(
-                        Icons.favorite_border,
-                        color: HColors.tertiary,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Padding(
-            padding: const EdgeInsets.all(12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'MASTERPIECE',
-                  style: HText.labelLg.copyWith(
-                    color: HColors.tertiary,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  product.name,
-                  style: HText.headlineMd,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '\$${product.price.toStringAsFixed(2)}',
-                  style: HText.headlineMd.copyWith(
-                    color: HColors.primary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildProductCard(Product product) {
-    return GestureDetector(
-      onTap: () => widget.onAddToCart(product),
-      child: Container(
-        decoration: BoxDecoration(
-          color: HColors.surface,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.06),
-              blurRadius: 20,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Container(
-              height: 140,
-              decoration: BoxDecoration(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(16),
-                  topRight: Radius.circular(16),
-                ),
-                color: HColors.surfaceContainerLowest,
-              ),
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  Image.network(
-                    product.imageUrl,
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) {
-                      return Container(
-                        color: HColors.surfaceContainerLow,
-                        child: const Icon(Icons.image_not_supported),
-                      );
-                    },
-                  ),
-                  Positioned(
-                    top: 8,
-                    right: 8,
-                    child: GestureDetector(
-                      onTap: () => widget.onFavoriteToggle(product),
-                      child: Container(
-                        padding: const EdgeInsets.all(6),
-                        decoration: BoxDecoration(
-                          color: HColors.background.withOpacity(0.8),
-                          shape: BoxShape.circle,
-                        ),
-                        child: Icon(
-                          Icons.favorite_border,
-                          color: HColors.tertiary,
-                          size: 18,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      product.name,
-                      style: HText.bodyLg,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const Spacer(),
-                    Text(
-                      '\$${product.price.toStringAsFixed(2)}',
-                      style: HText.labelLg.copyWith(
-                        color: HColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }
