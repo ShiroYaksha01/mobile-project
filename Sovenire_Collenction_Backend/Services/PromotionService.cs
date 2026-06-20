@@ -80,16 +80,16 @@ namespace Souvenir_Collection_Backend.Services
             return promotion;
         }
 
-        public async Task<bool> UpdatePromotionAsync(Guid promotionId, UpdatePromotionRequest request)
+        public async Task<Promotion?> UpdatePromotionAsync(Guid promotionId, UpdatePromotionRequest request)
         {
             var promotion = await _context.Promotions.FindAsync(promotionId);
-            if (promotion == null) return false;
+            if (promotion == null) return null;
 
             var codeExists = await _context.Promotions
                 .AnyAsync(p => p.Code == request.Code && p.Id != promotionId);
-            if (codeExists) return false;
+            if (codeExists) return null;
 
-            if (request.StartDate >= request.EndDate) return false;
+            if (request.StartDate >= request.EndDate) return null;
 
             promotion.Title        = request.Title;
             promotion.Code         = request.Code;
@@ -103,7 +103,7 @@ namespace Souvenir_Collection_Backend.Services
             promotion.UpdatedAt    = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return true;
+            return promotion;
         }
 
         public async Task<bool> DeletePromotionAsync(Guid promotionId)

@@ -27,7 +27,6 @@ global using Sovenire_Collenction_Backend.DTOs.Promotion;
 global using Sovenire_Collenction_Backend.DTOs.Collection;
 global using Sovenire_Collenction_Backend.DTOs.Order;
 global using Sovenire_Collenction_Backend.DTOs.Artisan;
-global using Sovenire_Collenction_Backend.DTOs.Admin;
 global using Souvenir_Collection_Backend.Enums;
 global using Sovenire_Collenction_Backend.Enums;
 

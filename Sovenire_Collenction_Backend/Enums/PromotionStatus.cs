@@ -1,7 +1,10 @@
-public enum PromotionStatus
+namespace Souvenir_Collection_Backend.Enums
 {
-    Active,
-    Inactive,
-    Expired,
-    Scheduled
+    public enum PromotionStatus
+    {
+        Active,
+        Inactive,
+        Expired,
+        Scheduled
+    }
 }

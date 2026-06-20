@@ -5,8 +5,10 @@ public class QuizAnswer
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public Guid QuestionId { get; set; }
-    public QuizQuestion QuizQuestion { get; set; }
+    public Guid? QuestionId { get; set; }
+    
+    [System.Text.Json.Serialization.JsonIgnore]
+    public QuizQuestion? QuizQuestion { get; set; }
 
     public string AnswerText { get; set; } = string.Empty;
     public string Tags { get; set; } = string.Empty; 

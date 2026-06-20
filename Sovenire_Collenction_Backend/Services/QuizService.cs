@@ -36,11 +36,47 @@ public class QuizService
 
     public async Task<QuizQuestion?> UpdateQuestionAsync(Guid id, QuizQuestion updated)
     {
-        var question = await _context.QuizQuestions.FindAsync(id);
+        var question = await _context.QuizQuestions
+            .Include(q => q.QuizAnswers)
+            .FirstOrDefaultAsync(q => q.Id == id);
         if (question == null) return null;
 
         question.QuestionText = updated.QuestionText;
         question.DisplayOrder = updated.DisplayOrder;
+
+        if (updated.QuizAnswers != null && updated.QuizAnswers.Count > 0)
+        {
+            var existingAnswers = question.QuizAnswers.ToList();
+            var updatedIds = updated.QuizAnswers.Select(a => a.Id).ToList();
+
+            foreach (var existing in existingAnswers)
+            {
+                if (!updatedIds.Contains(existing.Id))
+                {
+                    _context.QuizAnswers.Remove(existing);
+                }
+            }
+
+            // Update or add answers
+            foreach (var updatedAnswer in updated.QuizAnswers)
+            {
+                var existing = existingAnswers.FirstOrDefault(a => a.Id == updatedAnswer.Id);
+                if (existing != null)
+                {
+                    existing.AnswerText = updatedAnswer.AnswerText;
+                    existing.Tags = updatedAnswer.Tags;
+                }
+                else
+                {
+                    updatedAnswer.QuestionId = id;
+                    if (updatedAnswer.Id == Guid.Empty)
+                    {
+                        updatedAnswer.Id = Guid.NewGuid();
+                    }
+                    _context.QuizAnswers.Add(updatedAnswer);
+                }
+            }
+        }
 
         await _context.SaveChangesAsync();
         return question;
@@ -54,6 +90,11 @@ public class QuizService
         _context.QuizQuestions.Remove(question);
         await _context.SaveChangesAsync();
         return true;
+    }
+
+    public async Task<QuizAnswer?> GetAnswerByIdAsync(Guid id)
+    {
+        return await _context.QuizAnswers.FindAsync(id);
     }
 
     public async Task<List<QuizAnswer>> GetAnswersByQuestionIdAsync(Guid questionId)

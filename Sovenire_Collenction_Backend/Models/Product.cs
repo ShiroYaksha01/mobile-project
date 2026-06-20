@@ -12,12 +12,16 @@ namespace Souvenir_Collection_Backend.Models
         public Guid ArtisanId { get; set; }
 
         [ForeignKey(nameof(ArtisanId))]
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public Artisan? Artisan { get; set; }
 
         // Category FK + Navigation
         public Guid CategoryId { get; set; }
 
         [ForeignKey(nameof(CategoryId))]
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public Category? Category { get; set; }
 
         [Required]
@@ -39,9 +43,25 @@ namespace Souvenir_Collection_Backend.Models
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public Guid? CollectionId { get; set; }
+
+        [ForeignKey(nameof(CollectionId))]
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
+        public Collection? Collection { get; set; }
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public ICollection<CartItem> CartItems { get; set; } = new List<CartItem>();
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public ICollection<OrderItem> OrderItems { get; set; } = new List<OrderItem>();
-        public ICollection<CollectionProduct> CollectionProducts { get; set; } = new List<CollectionProduct>();
+
+        [Newtonsoft.Json.JsonIgnore]
+        [System.Text.Json.Serialization.JsonIgnore]
         public ICollection<Favorite> Favorites { get; set; } = new List<Favorite>();
     }
 }

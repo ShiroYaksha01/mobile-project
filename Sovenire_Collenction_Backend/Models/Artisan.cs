@@ -5,8 +5,9 @@ public class Artisan
     [Key]
     public Guid Id { get; set; } = Guid.NewGuid();
 
-    public Guid UserId { get; set; }
-    public User User { get; set; }
+    [Column("user_id")]
+    public Guid? UserId { get; set; }
+    public User? User { get; set; }
 
     public string DisplayName { get; set; } = string.Empty;
     public string Region { get; set; } = string.Empty;

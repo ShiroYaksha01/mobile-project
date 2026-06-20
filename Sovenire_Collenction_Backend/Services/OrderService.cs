@@ -21,7 +21,7 @@ namespace Souvenir_Collection_Backend.Services
                 .ToListAsync();
         }
 
-        public async Task<Order> GetOrderByIdAsync(Guid orderId, Guid userId)
+        public async Task<Order?> GetOrderByIdAsync(Guid orderId, Guid userId)
         {
             return await _context.Orders
                 .Include(o => o.OrderItems)
@@ -31,7 +31,7 @@ namespace Souvenir_Collection_Backend.Services
                 .FirstOrDefaultAsync(o => o.Id == orderId && o.UserId == userId);
         }
 
-        public async Task<Order> CreateOrderAsync(Guid userId, CreateOrderRequest request)
+        public async Task<Order?> CreateOrderAsync(Guid userId, CreateOrderRequest request)
         {
             var cartItems = await _context.CartItems
                 .Include(c => c.Product)
@@ -42,7 +42,7 @@ namespace Souvenir_Collection_Backend.Services
 
             foreach (var item in cartItems)
             {
-                if (item.Product.Stock < item.Quantity) return null;
+                if (item.Product.StockQty < item.Quantity) return null;
             }
 
             var subTotal = cartItems.Sum(c => c.Product.Price * c.Quantity);
@@ -52,16 +52,16 @@ namespace Souvenir_Collection_Backend.Services
             {
                 var promotion = await _context.Promotions
                     .FirstOrDefaultAsync(p => p.Id == request.PromotionId &&
-                                             p.IsActive &&
+                                             p.Status == PromotionStatus.Active &&
                                              p.StartDate <= DateTime.UtcNow &&
                                              p.EndDate >= DateTime.UtcNow);
-                if (promotion != null)
+                if (promotion != null && promotion.UsageCount < promotion.UsageLimit)
                 {
-                    discountAmount = promotion.DiscountType == "percentage"
-                        ? subTotal * (promotion.DiscountValue / 100)
-                        : promotion.DiscountValue;
+                    discountAmount = promotion.DiscountType == DiscountType.Percentage
+                        ? subTotal * (promotion.Discount / 100)
+                        : promotion.Discount;
 
-                    promotion.TimesUsed += 1;
+                    promotion.UsageCount += 1;
                 }
             }
 
@@ -92,14 +92,15 @@ namespace Souvenir_Collection_Backend.Services
                     OrderId   = order.Id,
                     ProductId = item.ProductId,
                     Quantity  = item.Quantity,
-                    Price     = item.Product.Price,
-                    CreatedAt = DateTime.UtcNow,
+                    UnitPrice = item.Product.Price,
+                    TotalPrice = item.Product.Price * item.Quantity,
+                    Status    = OrderItemStatus.Pending,
                     UpdatedAt = DateTime.UtcNow
                 };
 
                 await _context.OrderItems.AddAsync(orderItem);
 
-                item.Product.Stock -= item.Quantity;
+                item.Product.StockQty -= item.Quantity;
             }
 
             _context.CartItems.RemoveRange(cartItems);
@@ -136,7 +137,10 @@ namespace Souvenir_Collection_Backend.Services
 
             foreach (var item in order.OrderItems)
             {
-                item.Product.Stock += item.Quantity;
+                if (item.Product != null)
+                {
+                    item.Product.StockQty += item.Quantity;
+                }
             }
 
             await _context.SaveChangesAsync();

@@ -34,19 +34,21 @@ namespace Souvenir_Collection_Backend.Services
         {
             return await _context.ChatRooms
                 .Include(r => r.Artisan)
-                    .ThenInclude(a => a.User)
                 .Include(r => r.ChatMessages.OrderByDescending(m => m.SentAt).Take(1))
                 .Where(r => r.UserId == userId)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
         }
 
-        public async Task<List<ChatRoom>> GetArtisanChatRoomsAsync(Guid artisanId)
+        public async Task<List<ChatRoom>> GetArtisanChatRoomsAsync(Guid artisanUserId)
         {
+            var artisan = await _context.Artisans.FirstOrDefaultAsync(a => a.UserId == artisanUserId);
+            if (artisan == null) return new List<ChatRoom>();
+
             return await _context.ChatRooms
                 .Include(r => r.User)
                 .Include(r => r.ChatMessages.OrderByDescending(m => m.SentAt).Take(1))
-                .Where(r => r.ArtisanId == artisanId)
+                .Where(r => r.ArtisanId == artisan.Id)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
         }
@@ -56,14 +58,12 @@ namespace Souvenir_Collection_Backend.Services
             return await _context.ChatRooms
                 .Include(r => r.User)
                 .Include(r => r.Artisan)
-                    .ThenInclude(a => a.User)
                 .FirstOrDefaultAsync(r => r.Id == chatRoomId);
         }
 
         public async Task<List<ChatMessage>> GetMessagesAsync(Guid roomId)
         {
             return await _context.ChatMessages
-                .Include(m => m.Sender)
                 .Where(m => m.RoomId == roomId)
                 .OrderBy(m => m.SentAt)
                 .ToListAsync();
@@ -74,10 +74,9 @@ namespace Souvenir_Collection_Backend.Services
             var chatRoom = await _context.ChatRooms.FindAsync(roomId);
             if (chatRoom == null) return null;
 
-            var artisan = await _context.Artisans
-                .FirstOrDefaultAsync(a => a.Id == chatRoom.ArtisanId && a.UserId == senderId);
+            var artisan = await _context.Artisans.FirstOrDefaultAsync(a => a.UserId == senderId);
 
-            var isParticipant = chatRoom.UserId == senderId || artisan != null;
+            var isParticipant = chatRoom.UserId == senderId || (artisan != null && chatRoom.ArtisanId == artisan.Id);
             if (!isParticipant) return null;
 
             var message = new ChatMessage
@@ -111,9 +110,11 @@ namespace Souvenir_Collection_Backend.Services
 
         public async Task<int> GetUnreadCountAsync(Guid userId)
         {
+            var artisan = await _context.Artisans.FirstOrDefaultAsync(a => a.UserId == userId);
+
             return await _context.ChatMessages
                 .Include(m => m.ChatRoom)
-                .CountAsync(m => m.ChatRoom.UserId == userId &&
+                .CountAsync(m => (m.ChatRoom.UserId == userId || (artisan != null && m.ChatRoom.ArtisanId == artisan.Id)) &&
                                  m.SenderId != userId &&
                                  m.IsRead == false);
         }
@@ -128,6 +129,18 @@ namespace Souvenir_Collection_Backend.Services
             _context.ChatMessages.Remove(message);
             await _context.SaveChangesAsync();
             return true;
+        }
+
+        public async Task<ChatMessage> UpdateMessageAsync(Guid messageId, Guid senderId, string newBody)
+        {
+            var message = await _context.ChatMessages
+                .FirstOrDefaultAsync(m => m.Id == messageId && m.SenderId == senderId);
+
+            if (message == null) return null;
+
+            message.Body = newBody;
+            await _context.SaveChangesAsync();
+            return message;
         }
     }
 }
