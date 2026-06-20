@@ -11,6 +11,7 @@
     <PackageReference Include="AutoMapper.Extensions.Microsoft.DependencyInjection" Version="12.0.1" />
     <PackageReference Include="BCrypt.Net-Next" Version="4.2.0" />
     <PackageReference Include="DotNetEnv" Version="3.2.0" />
+    <PackageReference Include="EFCore.NamingConventions" Version="10.0.1" />
     <PackageReference Include="FluentValidation.AspNetCore" Version="11.3.1" />
     <PackageReference Include="Microsoft.AspNetCore.Authentication.JwtBearer" Version="10.0.8" />
     <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
@@ -29,20 +30,5 @@
     <PackageReference Include="Serilog.AspNetCore" Version="10.0.0" />
     <PackageReference Include="Supabase" Version="1.1.1" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="10.1.7" />
-  </ItemGroup>
-
-  <ItemGroup>
-    <!-- Temporarily exclude incomplete folders so we can compile and test the Auth APIs -->
-    <Compile Remove="Controllers\**\*.cs" />
-    <Compile Remove="Services\**\*.cs" />
-    <Compile Remove="Data\Configurations\**\*.cs" />
-    <Compile Remove="Hubs\**\*.cs" />
-    <Compile Remove="Mappings\**\*.cs" />
-    
-    <!-- Include only the fully implemented Auth API files -->
-    <Compile Include="Controllers\AuthController.cs" />
-    <Compile Include="Services\AuthService.cs" />
-    <Compile Include="Services\TokenService.cs" />
-    <Compile Include="Services\UserService.cs" />
   </ItemGroup>
 </Project>

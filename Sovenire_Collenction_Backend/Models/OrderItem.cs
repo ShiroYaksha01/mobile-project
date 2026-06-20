@@ -22,5 +22,8 @@ public class OrderItem
 
     [Column(TypeName = "decimal(10,2)")]
     public decimal TotalPrice { get; set; }    
+
+    public OrderItemStatus Status { get; set; } = OrderItemStatus.Pending;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 }

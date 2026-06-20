@@ -2,6 +2,10 @@ namespace Sovenire_Collenction_Backend.DTOs.Order
 {
     public class CreateOrderRequest
     {
-        public string ShippingAddress { get; set; } = string.Empty;
+        public Guid? PromotionId { get; set; }
+        public string PaymentMethod { get; set; } = string.Empty;
+        public string DeliveryAddress { get; set; } = string.Empty;
+        public string DeliveryMessage { get; set; } = string.Empty;
+        public DateTime DeliveryDate { get; set; }
     }
 }

@@ -24,8 +24,6 @@ namespace Souvenir_Collection_Backend.Services
             return await _context.Products
                 .Include(p => p.Artisan)
                 .Include(p => p.Category)
-                .Include(p => p.CollectionProducts)
-                    .ThenInclude(cp => cp.Collection)
                 .FirstOrDefaultAsync(p => p.Id == productId);
         }
 
@@ -58,17 +56,18 @@ namespace Souvenir_Collection_Backend.Services
                 .ToListAsync();
         }
 
-        public async Task<Product> CreateProductAsync(Guid artisanId, CreateProductRequest request)
+        public async Task<(Product? Product, string? Error)> CreateProductAsync(CreateProductRequest request)
         {
-            var artisanExists = await _context.Artisans.AnyAsync(a => a.Id == artisanId);
-            if (!artisanExists) return null;
+            var artisanExists = await _context.Artisans.AnyAsync(a => a.Id == request.ArtisanId);
+            if (!artisanExists) return (null, $"Artisan with ID {request.ArtisanId} not found.");
 
             var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId);
-            if (!categoryExists) return null;
+            if (!categoryExists) return (null, $"Category with ID {request.CategoryId} not found.");
 
             var product = new Product
             {
-                ArtisanId   = artisanId,
+                Id          = Guid.NewGuid(),
+                ArtisanId   = request.ArtisanId,
                 CategoryId  = request.CategoryId,
                 Name        = request.Name,
                 Description = request.Description,
@@ -82,19 +81,31 @@ namespace Souvenir_Collection_Backend.Services
 
             await _context.Products.AddAsync(product);
             await _context.SaveChangesAsync();
-            return product;
+
+            var loadedProduct = await _context.Products
+                .Include(p => p.Artisan)
+                .Include(p => p.Category)
+                .FirstOrDefaultAsync(p => p.Id == product.Id);
+
+            return (loadedProduct, null);
         }
 
-        public async Task<bool> UpdateProductAsync(Guid artisanId, Guid productId, UpdateProductRequest request)
+        public async Task<Product?> UpdateProductAsync(Guid productId, UpdateProductRequest request)
         {
             var product = await _context.Products
-                .FirstOrDefaultAsync(p => p.Id == productId && p.ArtisanId == artisanId);
+                .Include(p => p.Category)
+                .Include(p => p.Artisan)
+                .FirstOrDefaultAsync(p => p.Id == productId);
 
-            if (product == null) return false;
+            if (product == null) return null;
+
+            var artisanExists = await _context.Artisans.AnyAsync(a => a.Id == request.ArtisanId);
+            if (!artisanExists) return null;
 
             var categoryExists = await _context.Categories.AnyAsync(c => c.Id == request.CategoryId);
-            if (!categoryExists) return false;
+            if (!categoryExists) return null;
 
+            product.ArtisanId   = request.ArtisanId;
             product.CategoryId  = request.CategoryId;
             product.Name        = request.Name;
             product.Description = request.Description;
@@ -105,14 +116,18 @@ namespace Souvenir_Collection_Backend.Services
             product.UpdatedAt   = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return true;
+
+            var updatedProduct = await _context.Products
+                .Include(p => p.Category)
+                .Include(p => p.Artisan)
+                .FirstOrDefaultAsync(p => p.Id == productId);
+
+            return updatedProduct;
         }
         
-        public async Task<bool> DeleteProductAsync(Guid artisanId, Guid productId)
+        public async Task<bool> DeleteProductAsync(Guid productId)
         {
-            var product = await _context.Products
-                .FirstOrDefaultAsync(p => p.Id == productId && p.ArtisanId == artisanId);
-
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
             if (product == null) return false;
 
             _context.Products.Remove(product);
@@ -120,11 +135,9 @@ namespace Souvenir_Collection_Backend.Services
             return true;
         }
 
-        public async Task<bool> ToggleAvailabilityAsync(Guid artisanId, Guid productId)
+        public async Task<bool> ToggleAvailabilityAsync(Guid productId)
         {
-            var product = await _context.Products
-                .FirstOrDefaultAsync(p => p.Id == productId && p.ArtisanId == artisanId);
-
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
             if (product == null) return false;
 
             product.IsAvailable = !product.IsAvailable;
@@ -134,11 +147,9 @@ namespace Souvenir_Collection_Backend.Services
             return true;
         }
 
-        public async Task<bool> UpdateStockAsync(Guid artisanId, Guid productId, int quantity)
+        public async Task<bool> UpdateStockAsync(Guid productId, int quantity)
         {
-            var product = await _context.Products
-                .FirstOrDefaultAsync(p => p.Id == productId && p.ArtisanId == artisanId);
-
+            var product = await _context.Products.FirstOrDefaultAsync(p => p.Id == productId);
             if (product == null) return false;
             if (quantity < 0) return false;
 

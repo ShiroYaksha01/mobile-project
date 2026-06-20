@@ -9,9 +9,9 @@ namespace Sovenire_Collenction_Backend.Middleware
                 await _next(context);
             }
             catch (Exception ex){
-                Console.WriteLine($"Error: {ex.Message}");    
+                Console.WriteLine($"Error Details: {ex}");    
                 context.Response.StatusCode = 500;
-                await context.Response.WriteAsJsonAsync(new { error = ex.Message });    
+                await context.Response.WriteAsJsonAsync(new { error = ex.Message, details = ex.InnerException?.Message });    
             }
         } 
     }

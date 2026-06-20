@@ -1,5 +1,8 @@
-public enum DiscountType
+namespace Souvenir_Collection_Backend.Enums
 {
-    Percentage,
-    FixedAmount
+    public enum DiscountType
+    {
+        Percentage,
+        FixedAmount
+    }
 }

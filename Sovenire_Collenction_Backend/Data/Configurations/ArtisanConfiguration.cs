@@ -19,11 +19,6 @@ public class ArtisanConfiguration : IEntityTypeConfiguration<Artisan>
         builder.Property(a => a.Lng)
             .HasColumnType("decimal(9,6)");
 
-        builder.HasOne(a => a.User)
-            .WithOne()
-            .HasForeignKey<Artisan>(a => a.UserId)
-            .OnDelete(DeleteBehavior.Cascade);
-
         builder.HasMany(a => a.Products)
             .WithOne(p => p.Artisan)
             .HasForeignKey(p => p.ArtisanId)

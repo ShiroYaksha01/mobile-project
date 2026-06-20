@@ -17,7 +17,6 @@ public class ReviewService
         return await _context.Reviews
             .Include(r => r.User)
             .Include(r => r.Product)
-            .Include(r => r.Collection)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
     }
@@ -27,7 +26,6 @@ public class ReviewService
         return await _context.Reviews
             .Include(r => r.User)
             .Include(r => r.Product)
-            .Include(r => r.Collection)
             .FirstOrDefaultAsync(r => r.Id == id);
     }
 
@@ -40,20 +38,12 @@ public class ReviewService
             .ToListAsync();
     }
 
-    public async Task<List<Review>> GetReviewsByCollectionIdAsync(Guid collectionId)
-    {
-        return await _context.Reviews
-            .Include(r => r.User)
-            .Where(r => r.CollectionId == collectionId)
-            .OrderByDescending(r => r.CreatedAt)
-            .ToListAsync();
-    }
+
 
     public async Task<List<Review>> GetReviewsByUserIdAsync(Guid userId)
     {
         return await _context.Reviews
             .Include(r => r.Product)
-            .Include(r => r.Collection)
             .Where(r => r.UserId == userId)
             .OrderByDescending(r => r.CreatedAt)
             .ToListAsync();
@@ -100,13 +90,5 @@ public class ReviewService
         return ratings.Any() ? ratings.Average() : 0;
     }
 
-    public async Task<double> GetAverageRatingByCollectionIdAsync(Guid collectionId)
-    {
-        var ratings = await _context.Reviews
-            .Where(r => r.CollectionId == collectionId)
-            .Select(r => r.Rating)
-            .ToListAsync();
 
-        return ratings.Any() ? ratings.Average() : 0;
-    }
 }

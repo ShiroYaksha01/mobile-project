@@ -21,10 +21,11 @@ namespace Souvenir_Collection_Backend.Models
 
         public string Image { get; set; } = string.Empty;
 
-        public int DisplayOrder { get; set; } = 1;
-
         public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
         public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
+
+        [System.Text.Json.Serialization.JsonIgnore]
+        public ICollection<Product> Products { get; set; } = new List<Product>();
     }
 }

@@ -9,76 +9,113 @@ namespace Souvenir_Collection_Backend.Services
             _context = context;
         }
 
-        public async Task<List<User>> GetAllArtisanAsync()
+        // ✅ Fixed: query Artisans directly instead of Users
+        public async Task<List<Artisan>> GetAllArtisanAsync()
         {
-            return await _context.Users
-                .Include(u => u.Artisan)
-                    .ThenInclude(a => a.Products)
-                .Where(u => u.ArtisanId != null)
-                .OrderByDescending(u => u.CreatedAt)
+            return await _context.Artisans
+                .Include(a => a.Products)
+                .OrderByDescending(a => a.CreatedAt)
                 .ToListAsync();
+        }
+
+        public async Task<Artisan?> CreateArtisanAsync(CreateArtisanRequest request)
+        {
+            var artisan = new Artisan
+            {
+                Id = Guid.NewGuid(),
+                DisplayName = request.DisplayName,
+                Region = request.Region,
+                CraftType = request.CraftType,
+                Bio = request.Bio,
+                ProfilePhotoUrl = request.ProfilePhotoUrl,
+                ShopAddress = request.ShopAddress,
+                Lat = request.Lat,
+                Lng = request.Lng,
+                IsVerified = false,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            await _context.Artisans.AddAsync(artisan);
+            await _context.SaveChangesAsync();
+            return artisan;
         }
 
         public async Task<Artisan> GetArtisanByIdAsync(Guid artisanId)
         {
             return await _context.Artisans
-                .Include(a => a.User)
                 .Include(a => a.Products)
                 .FirstOrDefaultAsync(a => a.Id == artisanId);
         }
 
-        public async Task<bool> VerifyArtisanAsync(Guid artisanId)
+        public async Task<Artisan?> VerifyArtisanAsync(Guid artisanId)
         {
             var artisan = await _context.Artisans.FindAsync(artisanId);
-            if (artisan == null) return false;
+            if (artisan == null) return null;
 
             artisan.IsVerified = true;
-            artisan.VerifiedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return true;
+            return artisan;
         }
 
-        public async Task<bool> UnverifyArtisanAsync(Guid artisanId)
+        public async Task<Artisan?> UnverifyArtisanAsync(Guid artisanId)
         {
             var artisan = await _context.Artisans.FindAsync(artisanId);
-            if (artisan == null) return false;
+            if (artisan == null) return null;
 
             artisan.IsVerified = false;
-            artisan.VerifiedAt = null;
 
             await _context.SaveChangesAsync();
-            return true;
+            return artisan;
         }
-
 
         public async Task<Artisan> GetArtisanProfileAsync(Guid artisanId)
         {
             return await _context.Artisans
-                .Include(a => a.User)
                 .Include(a => a.Products)
                 .FirstOrDefaultAsync(a => a.Id == artisanId);
         }
 
-        public async Task<bool> UpdateArtisanProfileAsync(Guid artisanId, UpdateArtisanProfileRequest request)
+        public async Task<Artisan?> UpdateArtisanProfileAsync(Guid artisanId, UpdateArtisanProfileRequest request)
         {
             var artisan = await _context.Artisans
-                .Include(a => a.User)
                 .FirstOrDefaultAsync(a => a.Id == artisanId);
 
-            if (artisan == null) return false;
+            if (artisan == null) return null;
 
-            artisan.ShopName        = request.ShopName;
-            artisan.Bio             = request.Bio;
-            artisan.ProfilePhoto    = request.ProfilePhoto;
-            artisan.PhoneNumber     = request.PhoneNumber;
-            artisan.Location        = request.Location;
+            if (request.ShopName != null) artisan.DisplayName = request.ShopName;
+            if (request.Bio != null) artisan.Bio = request.Bio;
+            if (request.ProfilePhoto != null) artisan.ProfilePhotoUrl = request.ProfilePhoto;
+            if (request.Location != null) artisan.ShopAddress = request.Location;
             artisan.UpdatedAt       = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return true;
+            return artisan;
         }
 
+        public async Task<Artisan?> UpdateArtisanAsync(Guid id, UpdateArtisanRequest request)
+        {
+            var artisan = await _context.Artisans
+                .FirstOrDefaultAsync(a => a.Id == id);
+
+            if (artisan == null) return null;
+
+            if (request.DisplayName != null) artisan.DisplayName = request.DisplayName;
+            if (request.Region != null) artisan.Region = request.Region;
+            if (request.CraftType != null) artisan.CraftType = request.CraftType;
+            if (request.Bio != null) artisan.Bio = request.Bio;
+            if (request.ProfilePhotoUrl != null) artisan.ProfilePhotoUrl = request.ProfilePhotoUrl;
+            if (request.ShopAddress != null) artisan.ShopAddress = request.ShopAddress;
+            if (request.Lat.HasValue) artisan.Lat = request.Lat.Value;
+            if (request.Lng.HasValue) artisan.Lng = request.Lng.Value;
+            if (request.IsVerified.HasValue) artisan.IsVerified = request.IsVerified.Value;
+
+            artisan.UpdatedAt = DateTime.UtcNow;
+
+            await _context.SaveChangesAsync();
+            return artisan;
+        }
 
         public async Task<List<Product>> GetMyProductsAsync(Guid artisanId)
         {
@@ -97,17 +134,17 @@ namespace Souvenir_Collection_Backend.Services
 
             var product = new Product
             {
-                Id           = Guid.NewGuid(),
-                ArtisanId    = artisanId,
-                Name         = request.Name,
-                Description  = request.Description,
-                Price        = request.Price,
-                Stock        = request.Stock,
-                ImageUrl     = request.ImageUrl,
-                CategoryId   = request.CategoryId,
-                CollectionId = request.CollectionId,
-                CreatedAt    = DateTime.UtcNow,
-                UpdatedAt    = DateTime.UtcNow
+                Id          = Guid.NewGuid(),
+                ArtisanId   = artisanId,
+                Name        = request.Name,
+                Description = request.Description,
+                Price       = request.Price,
+                StockQty    = request.StockQty,
+                Image       = request.Image,
+                CategoryId  = request.CategoryId,
+                IsAvailable = request.IsAvailable,
+                CreatedAt   = DateTime.UtcNow,
+                UpdatedAt   = DateTime.UtcNow
             };
 
             await _context.Products.AddAsync(product);
@@ -115,24 +152,25 @@ namespace Souvenir_Collection_Backend.Services
             return product;
         }
 
-        public async Task<bool> UpdateProductAsync(Guid artisanId, Guid productId, UpdateProductRequest request)
+        public async Task<Product?> UpdateProductAsync(Guid artisanId, Guid productId, UpdateProductRequest request)
         {
             var product = await _context.Products
+                .Include(p => p.Category)
                 .FirstOrDefaultAsync(p => p.Id == productId && p.ArtisanId == artisanId);
 
-            if (product == null) return false;
+            if (product == null) return null;
 
-            product.Name         = request.Name;
-            product.Description  = request.Description;
-            product.Price        = request.Price;
-            product.Stock        = request.Stock;
-            product.ImageUrl     = request.ImageUrl;
-            product.CategoryId   = request.CategoryId;
-            product.CollectionId = request.CollectionId;
-            product.UpdatedAt    = DateTime.UtcNow;
+            product.Name        = request.Name;
+            product.Description = request.Description;
+            product.Price       = request.Price;
+            product.StockQty    = request.StockQty;
+            product.Image       = request.Image;
+            product.CategoryId  = request.CategoryId;
+            product.IsAvailable = request.IsAvailable;
+            product.UpdatedAt   = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return true;
+            return product;
         }
 
         public async Task<bool> DeleteProductAsync(Guid artisanId, Guid productId)
@@ -146,6 +184,7 @@ namespace Souvenir_Collection_Backend.Services
             await _context.SaveChangesAsync();
             return true;
         }
+
         public async Task<List<Order>> GetMyOrdersAsync(Guid artisanId)
         {
             return await _context.Orders
@@ -153,7 +192,7 @@ namespace Souvenir_Collection_Backend.Services
                 .Include(o => o.OrderItems)
                     .ThenInclude(oi => oi.Product)
                 .Where(o => o.OrderItems.Any(oi => oi.Product.ArtisanId == artisanId))
-                .OrderByDescending(o => o.OrderDate)
+                .OrderByDescending(o => o.CreatedAt)
                 .ToListAsync();
         }
 
@@ -172,7 +211,6 @@ namespace Souvenir_Collection_Backend.Services
             return true;
         }
 
-
         public async Task<ArtisanDashboardDto> GetArtisanDashboardAsync(Guid artisanId)
         {
             var totalProducts = await _context.Products
@@ -187,8 +225,9 @@ namespace Souvenir_Collection_Backend.Services
 
             var totalRevenue = await _context.OrderItems
                 .Where(oi => oi.Product.ArtisanId == artisanId &&
-                             oi.Order.Payment.Status == PaymentStatus.Success)
-                .SumAsync(oi => oi.Price * oi.Quantity);
+                             oi.Order.Payment != null &&
+                             oi.Order.Payment.Status == PaymentStatus.Paid)
+                .SumAsync(oi => oi.TotalPrice);
 
             var totalReviews = await _context.Reviews
                 .CountAsync(r => r.Product.ArtisanId == artisanId);
@@ -211,6 +250,16 @@ namespace Souvenir_Collection_Backend.Services
                 .Where(r => r.Product.ArtisanId == artisanId)
                 .OrderByDescending(r => r.CreatedAt)
                 .ToListAsync();
+        }
+
+        public async Task<bool> DeleteArtisanAsync(Guid artisanId)
+        {
+            var artisan = await _context.Artisans.FindAsync(artisanId);
+            if (artisan == null) return false;
+
+            _context.Artisans.Remove(artisan);
+            await _context.SaveChangesAsync();
+            return true;
         }
     }
 }

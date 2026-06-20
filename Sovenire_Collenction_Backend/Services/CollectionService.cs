@@ -9,38 +9,43 @@ namespace Souvenir_Collection_Backend.Services
             _context = context;
         }
 
-        public async Task<List<Collection>> GetAllCollectionsAsync()
+        public async Task<List<Collection>> GetAllCollectionsAsync(string sortOrder = "asc")
         {
-            return await _context.Collections
-                .Include(c => c.CollectionProducts)
-                    .ThenInclude(cp => cp.Product)
-                .OrderBy(c => c.DisplayOrder)
+            bool isDescending = !string.IsNullOrEmpty(sortOrder) && 
+                (sortOrder.Equals("desc", System.StringComparison.OrdinalIgnoreCase) || 
+                 sortOrder.Equals("des", System.StringComparison.OrdinalIgnoreCase));
+
+            var query = _context.Collections.AsQueryable();
+            
+            return await (isDescending 
+                ? query.OrderByDescending(c => c.Title) 
+                : query.OrderBy(c => c.Title))
                 .ToListAsync();
         }
 
         public async Task<Collection> GetCollectionByIdAsync(Guid collectionId)
         {
             return await _context.Collections
-                .Include(c => c.CollectionProducts)
-                    .ThenInclude(cp => cp.Product)
                 .FirstOrDefaultAsync(c => c.Id == collectionId);
         }
 
         public async Task<Collection> GetCollectionBySlugAsync(string slug)
         {
             return await _context.Collections
-                .Include(c => c.CollectionProducts)
-                    .ThenInclude(cp => cp.Product)
                 .FirstOrDefaultAsync(c => c.Slug == slug);
         }
 
-        public async Task<List<Collection>> GetCollectionsByTypeAsync(string type)
+        public async Task<List<Collection>> GetCollectionsByTypeAsync(string type, string sortOrder = "asc")
         {
-            return await _context.Collections
-                .Include(c => c.CollectionProducts)
-                    .ThenInclude(cp => cp.Product)
-                .Where(c => c.Type == type)
-                .OrderBy(c => c.DisplayOrder)
+            bool isDescending = !string.IsNullOrEmpty(sortOrder) && 
+                (sortOrder.Equals("desc", System.StringComparison.OrdinalIgnoreCase) || 
+                 sortOrder.Equals("des", System.StringComparison.OrdinalIgnoreCase));
+
+            var query = _context.Collections.Where(c => c.Type == type);
+            
+            return await (isDescending 
+                ? query.OrderByDescending(c => c.Title) 
+                : query.OrderBy(c => c.Title))
                 .ToListAsync();
         }
         public async Task<Collection> CreateCollectionAsync(CreateCollectionRequest request)
@@ -56,7 +61,6 @@ namespace Souvenir_Collection_Backend.Services
                 Description  = request.Description,
                 Type         = request.Type,
                 Image        = request.Image,
-                DisplayOrder = request.DisplayOrder,
                 CreatedAt    = DateTime.UtcNow,
                 UpdatedAt    = DateTime.UtcNow
             };
@@ -66,25 +70,25 @@ namespace Souvenir_Collection_Backend.Services
             return collection;
         }
 
-        public async Task<bool> UpdateCollectionAsync(Guid collectionId, UpdateCollectionRequest request)
+        public async Task<Collection?> UpdateCollectionAsync(Guid collectionId, UpdateCollectionRequest request)
         {
-            var collection = await _context.Collections.FindAsync(collectionId);
-            if (collection == null) return false;
+            var collection = await _context.Collections
+                .FirstOrDefaultAsync(c => c.Id == collectionId);
+            if (collection == null) return null;
 
             var slugExists = await _context.Collections
                 .AnyAsync(c => c.Slug == request.Slug && c.Id != collectionId);
-            if (slugExists) return false;
+            if (slugExists) return null;
 
             collection.Title        = request.Title;
             collection.Slug         = request.Slug;
             collection.Description  = request.Description;
             collection.Type         = request.Type;
             collection.Image        = request.Image;
-            collection.DisplayOrder = request.DisplayOrder;
             collection.UpdatedAt    = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
-            return true;
+            return collection;
         }
 
         public async Task<bool> DeleteCollectionAsync(Guid collectionId)
@@ -92,69 +96,58 @@ namespace Souvenir_Collection_Backend.Services
             var collection = await _context.Collections.FindAsync(collectionId);
             if (collection == null) return false;
 
+            // Nullify collection reference on associated products
+            var products = await _context.Products.Where(p => p.CollectionId == collectionId).ToListAsync();
+            foreach (var p in products)
+            {
+                p.CollectionId = null;
+            }
+
             _context.Collections.Remove(collection);
             await _context.SaveChangesAsync();
             return true;
         }
 
-        public async Task<bool> AddProductToCollectionAsync(Guid collectionId, Guid productId, int displayOrder)
+        public async Task<bool> AddProductToCollectionAsync(Guid collectionId, Guid productId)
         {
             var collectionExists = await _context.Collections.AnyAsync(c => c.Id == collectionId);
             if (!collectionExists) return false;
 
-            var productExists = await _context.Products.AnyAsync(p => p.Id == productId);
-            if (!productExists) return false;
+            var product = await _context.Products.FindAsync(productId);
+            if (product == null) return false;
 
-            var alreadyExists = await _context.CollectionProducts
-                .AnyAsync(cp => cp.CollectionId == collectionId && cp.ProductId == productId);
-            if (alreadyExists) return false;
+            product.CollectionId = collectionId;
+            product.UpdatedAt = DateTime.UtcNow;
 
-            var collectionProduct = new CollectionProduct
-            {
-                CollectionId = collectionId,
-                ProductId    = productId,
-                DisplayOrder = displayOrder,
-                CreatedAt    = DateTime.UtcNow,
-                UpdatedAt    = DateTime.UtcNow
-            };
-
-            await _context.CollectionProducts.AddAsync(collectionProduct);
             await _context.SaveChangesAsync();
             return true;
         }
 
         public async Task<bool> RemoveProductFromCollectionAsync(Guid collectionId, Guid productId)
         {
-            var collectionProduct = await _context.CollectionProducts
-                .FirstOrDefaultAsync(cp => cp.CollectionId == collectionId && cp.ProductId == productId);
+            var product = await _context.Products
+                .FirstOrDefaultAsync(p => p.Id == productId && p.CollectionId == collectionId);
 
-            if (collectionProduct == null) return false;
+            if (product == null) return false;
 
-            _context.CollectionProducts.Remove(collectionProduct);
-            await _context.SaveChangesAsync();
-            return true;
-        }
-
-        public async Task<bool> UpdateProductDisplayOrderAsync(Guid collectionId, Guid productId, int displayOrder)
-        {
-            var collectionProduct = await _context.CollectionProducts
-                .FirstOrDefaultAsync(cp => cp.CollectionId == collectionId && cp.ProductId == productId);
-
-            if (collectionProduct == null) return false;
-
-            collectionProduct.DisplayOrder = displayOrder;
-            collectionProduct.UpdatedAt    = DateTime.UtcNow;
+            product.CollectionId = null;
+            product.UpdatedAt = DateTime.UtcNow;
 
             await _context.SaveChangesAsync();
             return true;
         }
 
-        public async Task<List<CollectionProduct>> GetCollectionProductsAsync(Guid collectionId)
+        public async Task<List<Product>> GetCollectionProductsAsync(Guid collectionId, string sortOrder = "asc")
         {
-            return await _context.CollectionProducts
-                .Include(cp => cp.Product)
-                .Where(cp => cp.CollectionId == collectionId)
-                .OrderBy(cp => cp.DisplayOrder)
+            bool isDescending = !string.IsNullOrEmpty(sortOrder) && 
+                (sortOrder.Equals("desc", System.StringComparison.OrdinalIgnoreCase) || 
+                 sortOrder.Equals("des", System.StringComparison.OrdinalIgnoreCase));
+
+            var query = _context.Products.Where(p => p.CollectionId == collectionId);
+            
+            return await (isDescending 
+                ? query.OrderByDescending(p => p.Name) 
+                : query.OrderBy(p => p.Name))
                 .ToListAsync();
         }
     }

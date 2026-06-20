@@ -18,10 +18,7 @@ namespace Souvenir_Collection_Backend.Models
         [ForeignKey(nameof(ProductId))]
         public Product? Product { get; set; }
 
-        public Guid? CollectionId { get; set; }
 
-        [ForeignKey(nameof(CollectionId))]
-        public Collection? Collection { get; set; }
 
         public string? ReviewText { get; set; }    
 

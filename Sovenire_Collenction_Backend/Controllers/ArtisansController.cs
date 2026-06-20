@@ -113,8 +113,8 @@ namespace Sovenire_Collenction_Backend.Controllers
         };
 
         // 1. GET api/artisans
-        // 1. GET api/artisans
         [HttpGet]
+        
         public async Task<IActionResult> GetAllArtisans()
         {
             var artisans = await _artisanService.GetAllArtisanAsync() ?? new List<Artisan>();

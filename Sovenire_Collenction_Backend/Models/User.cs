@@ -6,6 +6,7 @@ namespace Sovenire_Collenction_Backend.Models
     public class User : BaseModel
     {
         [Supabase.Postgrest.Attributes.PrimaryKey("id", false)]
+        [Supabase.Postgrest.Attributes.Column("id")]
         public Guid Id { get; set; } = Guid.NewGuid();
 
         [Supabase.Postgrest.Attributes.Column("name")]
@@ -23,7 +24,7 @@ namespace Sovenire_Collenction_Backend.Models
         public UserRole Role { get; set; } = UserRole.Customer;
 
         [Supabase.Postgrest.Attributes.Column("phone")]
-        public string Phone { get; set; } = string.Empty;
+        public string? Phone { get; set; } = null;
 
         [Supabase.Postgrest.Attributes.Column("address")]
         public string Address { get; set; } = string.Empty;
@@ -39,9 +40,6 @@ namespace Sovenire_Collenction_Backend.Models
 
         
         // Navigation properties (not mapped directly by Postgrest column attributes)
-        [Newtonsoft.Json.JsonIgnore]
-        [System.Text.Json.Serialization.JsonIgnore]
-        public Artisan? Artisan { get; set; }
 
         [Newtonsoft.Json.JsonIgnore]
         [System.Text.Json.Serialization.JsonIgnore]

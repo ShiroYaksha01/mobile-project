@@ -8,5 +8,5 @@ public class QuizQuestion
     public string QuestionText { get; set; } = string.Empty;
     public int DisplayOrder { get; set; } = 0;
 
-    public ICollection<QuizAnswer> QuizAnswers { get; set; }
+    public ICollection<QuizAnswer> QuizAnswers { get; set; } = new List<QuizAnswer>();
 }

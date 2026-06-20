@@ -11,14 +11,13 @@ namespace Souvenir_Collection_Backend.Data.Configurations
             builder.Property(p => p.Amount)
                 .HasColumnType("decimal(10,2)");
 
-            builder.Property(p => p.Status)
-                .HasConversion<string>();
+            builder.Property(p => p.Status);
 
             builder.HasIndex(p => p.GatewayTxnId);
 
             builder.HasOne(p => p.Order)
-                .WithMany()
-                .HasForeignKey(p => p.OrderId)
+                .WithOne(o => o.Payment)
+                .HasForeignKey<Payment>(p => p.OrderId)
                 .OnDelete(DeleteBehavior.Restrict);
         }
     }
