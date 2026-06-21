@@ -1,69 +1,89 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import 'core/theme/app_theme.dart';
-import 'data/static_data.dart';
-import 'features/auth/login_screen.dart';
-import 'features/auth/register_screen.dart';
-import 'features/home/home_screen.dart';
-import 'features/landing/landing_screen.dart';
-import 'features/map/nearby_screen.dart';
-import 'features/order/cart_screen.dart';
-import 'features/saved/favorites_screen.dart';
-import 'features/shop/shop_screen.dart';
+import 'services/api_client.dart';
+import 'services/auth_service.dart';
 import 'services/product_service.dart';
+import 'services/artisan_service.dart';
+import 'blocs/auth/auth_bloc.dart';
+import 'blocs/auth/auth_event.dart';
+import 'blocs/products/product_bloc.dart';
+import 'blocs/products/product_event.dart';
+import 'blocs/artisans/artisan_bloc.dart';
+import 'blocs/artisans/artisan_event.dart';
+import 'navigation/app_router.dart';
 
 void main() {
-  runApp(const MyApp());
+  WidgetsFlutterBinding.ensureInitialized();
+  runApp(const SouvenirApp());
 }
 
-class MyApp extends StatelessWidget {
-  const MyApp({super.key});
+class SouvenirApp extends StatefulWidget {
+  const SouvenirApp({super.key});
+
+  @override
+  State<SouvenirApp> createState() => _SouvenirAppState();
+}
+
+class _SouvenirAppState extends State<SouvenirApp> {
+  late final ApiClient apiClient;
+  late final AuthService authService;
+  late final ProductService productService;
+  late final ArtisanService artisanService;
+  late final AuthBloc authBloc;
+  late final ProductBloc productBloc;
+  late final ArtisanBloc artisanBloc;
+  late final AppRouter appRouter;
+
+  @override
+  void initState() {
+    super.initState();
+    // Initialize dependencies
+    apiClient = ApiClient();
+    authService = AuthService(apiClient);
+    productService = ProductService(apiClient);
+    artisanService = ArtisanService(apiClient);
+    
+    // Initialize blocs
+    authBloc = AuthBloc(authService: authService);
+    productBloc = ProductBloc(productService: productService);
+    artisanBloc = ArtisanBloc(artisanService: artisanService);
+
+    // Initial events
+    authBloc.add(AuthCheckRequested());
+    productBloc.add(LoadProductsRequested());
+    artisanBloc.add(LoadArtisansRequested());
+    
+    // Initialize Router
+    appRouter = AppRouter(authBloc);
+  }
+
+  @override
+  void dispose() {
+    authBloc.close();
+    productBloc.close();
+    artisanBloc.close();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'Crafted in Cambodia',
-      debugShowCheckedModeBanner: false,
-      theme: buildAppTheme(),
-      initialRoute: '/landing',
-      routes: {
-        '/landing': (context) => LandingScreen(
-              onBeginJourney: () {
-                Navigator.pushReplacementNamed(context, '/home');
-              },
-            ),
-        '/saved': (context) => const FavoritesScreen(),
-        '/cart': (context) => const CartScreen(),
-        '/nearby': (context) => const NearbyScreen(),
-        '/shop': (context) => ShopScreen(
-              products: StaticData.products,
-              onFavoriteToggle: (product) {
-                ProductService.toggleFavorite(product.id);
-              },
-              onAddToCart: (product) {
-                product.cartQty++;
-              },
-            ),
-        '/login': (context) => SignInScreen(
-              onSignIn: () {
-                Navigator.pushReplacementNamed(context, '/home');
-              },
-            ),
-        '/register': (context) => SignUpScreen(
-              onSignUp: () {
-                Navigator.pushReplacementNamed(context, '/home');
-              },
-            ),
-        '/home': (context) => HomeScreen(
-              products: StaticData.products,
-              onFavoriteToggle: (product) {
-                ProductService.toggleFavorite(product.id);
-              },
-              onAddToCart: (product) {
-                product.cartQty++;
-              },
-            ),
-      },
+    // Provide the Blocs globally at the root
+    return MultiBlocProvider(
+      providers: [
+        BlocProvider<AuthBloc>.value(value: authBloc),
+        BlocProvider<ProductBloc>.value(value: productBloc),
+        BlocProvider<ArtisanBloc>.value(value: artisanBloc),
+      ],
+      child: MaterialApp.router(
+        title: 'Khmer Souvenirs',
+        theme: buildAppTheme(),
+        darkTheme: buildDarkTheme(),
+        themeMode: ThemeMode.system,
+        routerConfig: appRouter.router,
+        debugShowCheckedModeBanner: false,
+      ),
     );
   }
 }

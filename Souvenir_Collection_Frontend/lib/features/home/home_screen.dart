@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -14,6 +15,8 @@ import '../../models/artisan.dart';
 import '../../models/nearby_shop.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
+import '../../blocs/artisans/artisan_bloc.dart';
+import '../../blocs/artisans/artisan_state.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<Product> products;
@@ -97,6 +100,8 @@ class _HomeScreenState extends State<HomeScreen> {
           if (_showSearch) _buildSearchBar(),
           SliverToBoxAdapter(child: _HeroSection()),
           SliverToBoxAdapter(child: const SizedBox(height: 24)),
+          SliverToBoxAdapter(child: _buildPromotionStrip()),
+          SliverToBoxAdapter(child: const SizedBox(height: 24)),
           SliverToBoxAdapter(child: _buildCategoryRow()),
           SliverToBoxAdapter(child: const SizedBox(height: 24)),
           SliverToBoxAdapter(
@@ -170,6 +175,43 @@ class _HomeScreenState extends State<HomeScreen> {
           selected: i == _selectedCategory,
           onTap: () => setState(() => _selectedCategory = i),
         ),
+      ),
+    );
+  }
+
+  Widget _buildPromotionStrip() {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 20),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: HColors.secondaryContainer,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: HColors.secondary.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.local_offer_outlined, color: HColors.secondary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Festive Special', style: HText.labelLg.copyWith(color: HColors.onSecondaryContainer, fontWeight: FontWeight.bold)),
+                const SizedBox(height: 2),
+                Text('Use code KHMER20 for 20% off all silk items.', style: HText.labelSm.copyWith(color: HColors.onSecondaryContainer.withValues(alpha: 0.8))),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+            decoration: BoxDecoration(
+              color: HColors.secondary,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text('COPY', style: HText.labelSm.copyWith(color: HColors.onSecondary, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
     );
   }
@@ -267,13 +309,27 @@ class _HomeScreenState extends State<HomeScreen> {
           const SizedBox(height: 20),
           SizedBox(
             height: 120,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              itemCount: StaticData.artisans.length,
-              separatorBuilder: (_, _) => const SizedBox(width: 24),
-              itemBuilder: (ctx, i) =>
-                  _ArtisanAvatar(artisan: StaticData.artisans[i], index: i),
+            child: BlocBuilder<ArtisanBloc, ArtisanState>(
+              builder: (context, state) {
+                if (state is ArtisanLoading) {
+                  return const Center(child: CircularProgressIndicator());
+                } else if (state is ArtisanError) {
+                  return Center(child: Text('Error: ${state.message}'));
+                } else if (state is ArtisanLoaded) {
+                  if (state.artisans.isEmpty) {
+                    return const Center(child: Text('No artisans found'));
+                  }
+                  return ListView.separated(
+                    scrollDirection: Axis.horizontal,
+                    padding: const EdgeInsets.symmetric(horizontal: 20),
+                    itemCount: state.artisans.length,
+                    separatorBuilder: (_, _) => const SizedBox(width: 24),
+                    itemBuilder: (ctx, i) =>
+                        _ArtisanAvatar(artisan: state.artisans[i], index: i),
+                  );
+                }
+                return const SizedBox.shrink();
+              },
             ),
           ),
         ],
