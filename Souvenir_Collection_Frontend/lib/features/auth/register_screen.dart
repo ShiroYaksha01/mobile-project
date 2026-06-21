@@ -1,374 +1,178 @@
-import 'package:flutter/gestures.dart';
 import 'package:flutter/material.dart';
-import '../../core/theme/app_colors.dart';
-import '../../core/theme/app_text_styles.dart';
-import '../../core/widgets/phka_chan_painter.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
-class SignUpScreen extends StatefulWidget {
-  final VoidCallback onSignUp;
-  const SignUpScreen({super.key, required this.onSignUp});
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_event.dart';
+import '../../blocs/auth/auth_state.dart';
+import '../../core/theme/app_colors.dart';
+import '../../core/widgets/gold_button.dart';
+import '../../core/widgets/loading_overlay.dart';
+
+class RegisterScreen extends StatefulWidget {
+  const RegisterScreen({super.key});
 
   @override
-  State<SignUpScreen> createState() => _SignUpScreenState();
+  State<RegisterScreen> createState() => _RegisterScreenState();
 }
 
-class _SignUpScreenState extends State<SignUpScreen> {
-  final _nameCtrl = TextEditingController();
-  final _emailCtrl = TextEditingController();
-  final _passCtrl = TextEditingController();
-  final _confirmPassCtrl = TextEditingController();
-  bool _obscurePass = true;
-  bool _obscureConfirmPass = true;
-  bool _agreeToTerms = false;
+class _RegisterScreenState extends State<RegisterScreen> {
+  final _formKey = GlobalKey<FormState>();
+  final _firstNameController = TextEditingController();
+  final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   @override
   void dispose() {
-    _nameCtrl.dispose();
-    _emailCtrl.dispose();
-    _passCtrl.dispose();
-    _confirmPassCtrl.dispose();
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
     super.dispose();
+  }
+
+  void _onRegisterPressed() {
+    if (_formKey.currentState?.validate() ?? false) {
+      context.read<AuthBloc>().add(
+            AuthRegisterRequested(
+              firstName: _firstNameController.text.trim(),
+              lastName: _lastNameController.text.trim(),
+              email: _emailController.text.trim(),
+              password: _passwordController.text,
+            ),
+          );
+    }
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: HColors.background,
-      body: Stack(
-        children: [
-          Positioned.fill(
-            child: CustomPaint(painter: PhkaChanPainter(opacity: 0.04)),
-          ),
-          Positioned(
-            top: -60,
-            right: -60,
-            child: Container(
-              width: 220,
-              height: 220,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    HColors.primaryContainer.withValues(alpha: 0.35),
-                    Colors.transparent
-                  ],
-                ),
+    return BlocConsumer<AuthBloc, AuthState>(
+      listener: (context, state) {
+        if (state is AuthFailure) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(state.message),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        } else if (state is AuthAuthenticated) {
+          context.go('/');
+        }
+      },
+      builder: (context, state) {
+        return LoadingOverlay(
+          isLoading: state is AuthLoading,
+          child: Scaffold(
+            appBar: AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back, color: AppColors.textPrimaryLight),
+                onPressed: () => context.pop(),
               ),
             ),
-          ),
-          Positioned(
-            bottom: -40,
-            left: -40,
-            child: Container(
-              width: 180,
-              height: 180,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                gradient: RadialGradient(
-                  colors: [
-                    HColors.secondaryContainer.withValues(alpha: 0.2),
-                    Colors.transparent
-                  ],
-                ),
-              ),
-            ),
-          ),
-          SafeArea(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.symmetric(horizontal: 24),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const SizedBox(height: 40),
-                  Center(
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: HColors.primary,
-                        borderRadius: BorderRadius.circular(20),
-                        boxShadow: [
-                          BoxShadow(
-                            color: HColors.primary.withValues(alpha: 0.3),
-                            blurRadius: 20,
-                            offset: const Offset(0, 8),
-                          )
-                        ],
-                      ),
-                      child: const Icon(
-                        Icons.spa,
-                        color: Colors.white,
-                        size: 36,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-                  Center(
-                    child: Text(
-                      'Crafted in Cambodia',
-                      style: HText.headlineLg.copyWith(color: HColors.primary),
-                    ),
-                  ),
-                  const SizedBox(height: 6),
-                  Center(
-                    child: Text(
-                      'Begin Your Heritage Journey',
-                      style: HText.bodyMd.copyWith(
-                        color: HColors.onSurfaceVariant,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 40),
-
-                  // Full Name Field
-                  Text(
-                    'FULL NAME',
-                    style: HText.labelSm.copyWith(
-                      color: HColors.primary,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _nameCtrl,
-                    keyboardType: TextInputType.name,
-                    decoration: const InputDecoration(
-                      hintText: 'Your full name',
-                      prefixIcon: Icon(
-                        Icons.person_outline,
-                        color: HColors.onSurfaceVariant,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Email Field
-                  Text(
-                    'EMAIL ADDRESS',
-                    style: HText.labelSm.copyWith(
-                      color: HColors.primary,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _emailCtrl,
-                    keyboardType: TextInputType.emailAddress,
-                    decoration: const InputDecoration(
-                      hintText: 'your@email.com',
-                      prefixIcon: Icon(
-                        Icons.mail_outline,
-                        color: HColors.onSurfaceVariant,
-                        size: 20,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Password Field
-                  Text(
-                    'PASSWORD',
-                    style: HText.labelSm.copyWith(
-                      color: HColors.primary,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _passCtrl,
-                    obscureText: _obscurePass,
-                    decoration: InputDecoration(
-                      hintText: '••••••••',
-                      prefixIcon: const Icon(
-                        Icons.lock_outline,
-                        color: HColors.onSurfaceVariant,
-                        size: 20,
-                      ),
-                      suffixIcon: GestureDetector(
-                        onTap: () => setState(() => _obscurePass = !_obscurePass),
-                        child: Icon(
-                          _obscurePass
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: HColors.onSurfaceVariant,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 20),
-
-                  // Confirm Password Field
-                  Text(
-                    'CONFIRM PASSWORD',
-                    style: HText.labelSm.copyWith(
-                      color: HColors.primary,
-                      letterSpacing: 1,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  TextFormField(
-                    controller: _confirmPassCtrl,
-                    obscureText: _obscureConfirmPass,
-                    decoration: InputDecoration(
-                      hintText: '••••••••',
-                      prefixIcon: const Icon(
-                        Icons.lock_outline,
-                        color: HColors.onSurfaceVariant,
-                        size: 20,
-                      ),
-                      suffixIcon: GestureDetector(
-                        onTap: () =>
-                            setState(() => _obscureConfirmPass = !_obscureConfirmPass),
-                        child: Icon(
-                          _obscureConfirmPass
-                              ? Icons.visibility_outlined
-                              : Icons.visibility_off_outlined,
-                          color: HColors.onSurfaceVariant,
-                          size: 20,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Terms & Conditions
-                  Row(
+            body: SafeArea(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Form(
+                  key: _formKey,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      SizedBox(
-                        width: 24,
-                        height: 24,
-                        child: Checkbox(
-                          value: _agreeToTerms,
-                          onChanged: (value) {
-                            setState(() => _agreeToTerms = value ?? false);
-                          },
-                          activeColor: HColors.primary,
-                          side: const BorderSide(
-                            color: HColors.outlineVariant,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: RichText(
-                          text: TextSpan(
-                            text: 'I agree to the ',
-                            style: HText.bodyMd.copyWith(
-                              color: HColors.onSurfaceVariant,
+                      const SizedBox(height: 10),
+                      Text(
+                        'Create Account',
+                        style: Theme.of(context).textTheme.headlineLarge?.copyWith(
+                              color: AppColors.primary,
                             ),
-                            children: [
-                              TextSpan(
-                                text: 'Terms of Service',
-                                style: HText.bodyMd.copyWith(
-                                  color: HColors.secondary,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                              TextSpan(text: ' and '),
-                              TextSpan(
-                                text: 'Privacy Policy',
-                                style: HText.bodyMd.copyWith(
-                                  color: HColors.secondary,
-                                  fontWeight: FontWeight.w600,
-                                  decoration: TextDecoration.underline,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ),
-                    ],
-                  ),
-                  const SizedBox(height: 28),
+                      const SizedBox(height: 8),
+                      Text(
+                        'Join us to save your favorite artisan pieces and track orders.',
+                        style: Theme.of(context).textTheme.bodyMedium,
+                      ),
+                      const SizedBox(height: 40),
 
-                  // Sign Up Button
-                  ElevatedButton(
-                    onPressed: _agreeToTerms ? widget.onSignUp : null,
-                    child: Text(
-                      'CREATE ACCOUNT',
-                      style: HText.labelLg.copyWith(color: Colors.white),
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Divider
-                  Row(
-                    children: [
-                      const Expanded(
-                        child: Divider(color: HColors.outlineVariant),
-                      ),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        child: Text(
-                          'or',
-                          style: HText.bodyMd.copyWith(
-                            color: HColors.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                      const Expanded(
-                        child: Divider(color: HColors.outlineVariant),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-
-                  // Google Sign Up Button
-                  OutlinedButton.icon(
-                    onPressed: widget.onSignUp,
-                    style: OutlinedButton.styleFrom(
-                      minimumSize: const Size.fromHeight(52),
-                      side: const BorderSide(color: HColors.outlineVariant),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                    ),
-                    icon: const Icon(
-                      Icons.g_mobiledata,
-                      color: HColors.onSurfaceVariant,
-                    ),
-                    label: Text(
-                      'Sign up with Google',
-                      style: HText.labelLg.copyWith(color: HColors.onSurface),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-
-                  // Sign In Link
-                  Center(
-                    child: RichText(
-                      text: TextSpan(
-                        text: 'Already have an account? ',
-                        style: HText.bodyMd.copyWith(
-                          color: HColors.onSurfaceVariant,
-                        ),
+                      Row(
                         children: [
-                          TextSpan(
-                            text: 'Sign In',
-                            style: HText.bodyMd.copyWith(
-                              color: HColors.secondary,
-                              fontWeight: FontWeight.w600,
-                              decoration: TextDecoration.underline,
-                            ),
-                            recognizer: TapGestureRecognizer()
-                              ..onTap = () {
-                                Navigator.pushNamed(context, '/login');
+                          Expanded(
+                            child: TextFormField(
+                              controller: _firstNameController,
+                              decoration: const InputDecoration(
+                                labelText: 'First Name',
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Required';
+                                }
+                                return null;
                               },
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Expanded(
+                            child: TextFormField(
+                              controller: _lastNameController,
+                              decoration: const InputDecoration(
+                                labelText: 'Last Name',
+                              ),
+                              validator: (value) {
+                                if (value == null || value.isEmpty) {
+                                  return 'Required';
+                                }
+                                return null;
+                              },
+                            ),
                           ),
                         ],
                       ),
-                    ),
+                      const SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: _emailController,
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(
+                          labelText: 'Email',
+                          prefixIcon: Icon(Icons.email_outlined),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.isEmpty || !value.contains('@')) {
+                            return 'Enter a valid email';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 16),
+
+                      TextFormField(
+                        controller: _passwordController,
+                        obscureText: true,
+                        decoration: const InputDecoration(
+                          labelText: 'Password',
+                          prefixIcon: Icon(Icons.lock_outline),
+                        ),
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'Password must be at least 6 characters';
+                          }
+                          return null;
+                        },
+                      ),
+                      const SizedBox(height: 40),
+
+                      GoldButton(
+                        text: 'Sign Up',
+                        onPressed: _onRegisterPressed,
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 32),
-                ],
+                ),
               ),
             ),
           ),
-        ],
-      ),
+        );
+      },
     );
   }
 }

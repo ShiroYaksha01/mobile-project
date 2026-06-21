@@ -7,83 +7,88 @@ import 'app_text_styles.dart';
 ThemeData buildAppTheme() {
   return ThemeData(
     useMaterial3: true,
-    scaffoldBackgroundColor: HColors.background,
-    fontFamily: 'BeVietnamPro',
+    scaffoldBackgroundColor: AppColors.backgroundLight,
+    fontFamily: GoogleFonts.outfit().fontFamily, // Modern typography
 
     colorScheme: const ColorScheme(
       brightness: Brightness.light,
 
-      primary: HColors.primary,
-      onPrimary: HColors.onPrimary,
+      primary: AppColors.primary,
+      onPrimary: AppColors.surfaceLight,
 
-      primaryContainer: HColors.primaryContainer,
-      onPrimaryContainer: HColors.onPrimaryContainer,
+      primaryContainer: AppColors.primaryLight,
+      onPrimaryContainer: AppColors.surfaceLight,
 
-      secondary: HColors.secondary,
-      onSecondary: HColors.onSecondary,
+      secondary: AppColors.secondary,
+      onSecondary: AppColors.textPrimaryLight,
 
-      secondaryContainer: HColors.secondaryContainer,
-      onSecondaryContainer: HColors.onSecondaryContainer,
+      secondaryContainer: AppColors.secondaryLight,
+      onSecondaryContainer: AppColors.textPrimaryLight,
 
-      tertiary: HColors.tertiary,
-      onTertiary: HColors.onTertiary,
+      tertiary: AppColors.primaryDark,
+      onTertiary: AppColors.surfaceLight,
 
-      tertiaryContainer: HColors.tertiaryContainer,
-      onTertiaryContainer: HColors.onTertiaryContainer,
+      tertiaryContainer: AppColors.primaryDark,
+      onTertiaryContainer: AppColors.surfaceLight,
 
-      error: Color(0xFFBA1A1A),
-      onError: Colors.white,
+      error: AppColors.error,
+      onError: AppColors.surfaceLight,
 
       errorContainer: Color(0xFFFFDAD6),
       onErrorContainer: Color(0xFF93000A),
 
-      surface: HColors.surface,
-      onSurface: HColors.onSurface,
+      surface: AppColors.surfaceLight,
+      onSurface: AppColors.textPrimaryLight,
 
-      outline: HColors.outline,
-      outlineVariant: HColors.outlineVariant,
+      outline: AppColors.textSecondaryLight,
+      outlineVariant: AppColors.surfaceVariantLight,
     ),
 
     appBarTheme: AppBarTheme(
-      backgroundColor: HColors.surface,
-      foregroundColor: HColors.onSurface,
+      backgroundColor: AppColors.surfaceLight,
+      foregroundColor: AppColors.textPrimaryLight,
       elevation: 0,
       centerTitle: true,
-      titleTextStyle: HText.headlineMd,
+      titleTextStyle: GoogleFonts.outfit(
+        fontSize: 20,
+        fontWeight: FontWeight.w600,
+        color: AppColors.textPrimaryLight,
+      ),
     ),
 
     textTheme: TextTheme(
-      displayLarge: HText.displayLg,
-      headlineLarge: HText.headlineLg,
-      headlineMedium: HText.headlineMd,
-      bodyLarge: HText.bodyLg,
-      bodyMedium: HText.bodyMd,
-      labelLarge: HText.labelLg,
-      labelSmall: HText.labelSm,
+      displayLarge: GoogleFonts.outfit(fontSize: 57, fontWeight: FontWeight.bold, color: AppColors.textPrimaryLight),
+      headlineLarge: GoogleFonts.outfit(fontSize: 32, fontWeight: FontWeight.bold, color: AppColors.textPrimaryLight),
+      headlineMedium: GoogleFonts.outfit(fontSize: 28, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+      bodyLarge: GoogleFonts.outfit(fontSize: 16, fontWeight: FontWeight.normal, color: AppColors.textPrimaryLight),
+      bodyMedium: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.normal, color: AppColors.textSecondaryLight),
+      labelLarge: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w600, color: AppColors.textPrimaryLight),
+      labelSmall: GoogleFonts.outfit(fontSize: 11, fontWeight: FontWeight.w500, color: AppColors.textSecondaryLight),
     ),
 
     inputDecorationTheme: InputDecorationTheme(
       filled: true,
-      fillColor: HColors.surfaceContainerLowest,
-      hintStyle: HText.bodyMd.copyWith(
-        color: HColors.onSurfaceVariant,
+      fillColor: AppColors.surfaceVariantLight,
+      hintStyle: GoogleFonts.outfit(
+        fontSize: 14,
+        color: AppColors.textSecondaryLight,
       ),
       border: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(
-          color: HColors.outlineVariant,
+          color: AppColors.surfaceVariantLight,
         ),
       ),
       enabledBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(
-          color: HColors.outlineVariant,
+          color: AppColors.surfaceVariantLight,
         ),
       ),
       focusedBorder: OutlineInputBorder(
         borderRadius: BorderRadius.circular(12),
         borderSide: const BorderSide(
-          color: HColors.primary,
+          color: AppColors.primary,
           width: 2,
         ),
       ),
@@ -94,39 +99,34 @@ ThemeData buildAppTheme() {
     ),
 
     floatingActionButtonTheme: FloatingActionButtonThemeData(
-      backgroundColor: HColors.primary,
-      foregroundColor: HColors.onPrimary,
+      backgroundColor: AppColors.primary,
+      foregroundColor: AppColors.surfaceLight,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
       ),
     ),
 
     bottomNavigationBarTheme: BottomNavigationBarThemeData(
-      backgroundColor: HColors.background,
-      selectedItemColor: HColors.primary,
-      unselectedItemColor: HColors.onSurfaceVariant,
-      selectedLabelStyle: HText.labelSm,
-      unselectedLabelStyle: HText.labelSm,
+      backgroundColor: AppColors.backgroundLight,
+      selectedItemColor: AppColors.primary,
+      unselectedItemColor: AppColors.textSecondaryLight,
+      selectedLabelStyle: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w600),
+      unselectedLabelStyle: GoogleFonts.outfit(fontSize: 12, fontWeight: FontWeight.w500),
     ),
 
     chipTheme: ChipThemeData(
-      backgroundColor: HColors.surfaceContainerHighest,
-      selectedColor: HColors.secondary,
-      labelStyle: HText.labelLg,
+      backgroundColor: AppColors.surfaceVariantLight,
+      selectedColor: AppColors.secondaryLight,
+      labelStyle: GoogleFonts.outfit(fontSize: 14, fontWeight: FontWeight.w500, color: AppColors.textPrimaryLight),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(50),
       ),
     ),
-
-    tabBarTheme: TabBarThemeData(
-      labelStyle: HText.labelLg,
-      unselectedLabelStyle: HText.labelLg.copyWith(
-        color: HColors.onSurfaceVariant,
-      ),
-      labelColor: HColors.primary,
-      unselectedLabelColor: HColors.onSurfaceVariant,
-      indicatorColor: HColors.primary,
-      dividerColor: HColors.surfaceContainerHigh,
-    ),
   );
+}
+
+ThemeData buildDarkTheme() {
+  // Dark theme implementation here...
+  // For now returning light theme to avoid errors
+  return buildAppTheme();
 }
