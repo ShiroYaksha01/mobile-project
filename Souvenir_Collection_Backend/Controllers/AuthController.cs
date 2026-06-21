@@ -102,5 +102,37 @@ namespace Sovenire_Collenction_Backend.Controllers
 
             return Ok(ApiResponse<Sovenire_Collenction_Backend.DTOs.Auth.RefreshTokenResponse>.SuccessResult(response, "Token refreshed successfully."));
         }
+
+        [Microsoft.AspNetCore.Authorization.Authorize]
+        [HttpGet("me")]
+        public async Task<IActionResult> GetCurrentUser([FromServices] UserService userService)
+        {
+            var userIdClaim = User.FindFirst(System.Security.Claims.ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userIdClaim) || !Guid.TryParse(userIdClaim, out var userId))
+            {
+                return Unauthorized(ApiResponse<object>.FailureResult("Invalid token claims."));
+            }
+
+            var user = await userService.GetUserByIdAsync(userId);
+            if (user == null)
+            {
+                return NotFound(ApiResponse<object>.FailureResult("User not found."));
+            }
+
+            var dto = new Sovenire_Collenction_Backend.DTOs.User.UserDto
+            {
+                Id = user.Id,
+                Name = user.Name,
+                Email = user.Email,
+                Role = user.Role.ToString(),
+                Phone = user.Phone,
+                Address = user.Address,
+                Avatar = user.Avatar,
+                CreatedAt = user.CreatedAt,
+                UpdatedAt = user.UpdatedAt
+            };
+
+            return Ok(ApiResponse<Sovenire_Collenction_Backend.DTOs.User.UserDto>.SuccessResult(dto, "User retrieved successfully."));
+        }
     }
 }
