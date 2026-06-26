@@ -14,6 +14,8 @@ import '../../services/favorites_service.dart';
 import '../../services/order_service.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_state.dart';
+import '../../blocs/cart/cart_cubit.dart';
+import '../../blocs/favorites/favorites_cubit.dart';
 
 class ShopScreen extends StatefulWidget {
   final List<Product> products;
@@ -40,6 +42,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
 
   List<String> _categories = ['All Crafts'];
   int _cartCount = 0;
+  String _sortBy = 'default';
 
   @override
   void initState() {
@@ -47,6 +50,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
     _tabController = TabController(length: 3, vsync: this);
     _loadCategories();
     _loadCartCount();
+    _loadFavorites();
   }
 
   Future<void> _loadCategories() async {
@@ -55,7 +59,9 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
       final cats = await productService.getCategories();
       if (mounted) {
         setState(() {
-          _categories = ['All Crafts', ...cats.map((c) => c['name']?.toString() ?? '')];
+          // Deduplicate categories
+          final names = cats.map((c) => c['name']?.toString() ?? '').where((n) => n.isNotEmpty).toSet().toList();
+          _categories = ['All Crafts', ...names];
         });
       }
     } catch (_) {}
@@ -67,7 +73,24 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
       if (authState is AuthAuthenticated) {
         final orderService = context.read<OrderService>();
         final count = await orderService.getCartCount(authState.user.id);
-        if (mounted) setState(() => _cartCount = count);
+        if (mounted) {
+          context.read<CartCubit>().setCount(count);
+          setState(() => _cartCount = count);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadFavorites() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        final favService = context.read<FavoritesService>();
+        final items = await favService.getFavoriteProducts(authState.user.id);
+        if (mounted) {
+          final ids = items.map((p) => p.id).toSet();
+          context.read<FavoritesCubit>().setFavorites(ids);
+        }
       }
     } catch (_) {}
   }
@@ -79,14 +102,16 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
 
   Future<void> _handleFavoriteToggle(Product product) async {
     final userId = _currentUserId;
-    if (userId == null) return;
+    if (userId == null || userId.isEmpty) {
+      _showLoginPrompt();
+      return;
+    }
     try {
       final favService = context.read<FavoritesService>();
       final isNowFavorited = await favService.toggleFavorite(userId, product.id);
       if (mounted) {
-        setState(() {
-          product.isFavorite = isNowFavorited;
-        });
+        context.read<FavoritesCubit>().toggle(product.id);
+        setState(() => product.isFavorite = isNowFavorited);
         widget.onFavoriteToggle?.call(product);
       }
     } catch (_) {}
@@ -94,24 +119,43 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
 
   Future<void> _handleAddToCart(Product product) async {
     final userId = _currentUserId;
-    if (userId == null) return;
+    if (userId == null || userId.isEmpty) {
+      _showLoginPrompt();
+      return;
+    }
     try {
       final orderService = context.read<OrderService>();
       await orderService.addToCart(userId, product.id);
       if (mounted) {
-        setState(() {
-          product.cartQty++;
-          _cartCount++;
-        });
+        context.read<CartCubit>().increment();
+        setState(() => product.cartQty++);
         widget.onAddToCart?.call(product);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${product.name} added to cart'),
             duration: const Duration(seconds: 2),
+            backgroundColor: HColors.success,
           ),
         );
       }
     } catch (_) {}
+  }
+
+  void _showLoginPrompt() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign in required'),
+        content: const Text('Please sign in to add items to cart or favorites.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () { Navigator.pop(ctx); context.go('/login'); },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -121,8 +165,8 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
     super.dispose();
   }
 
-  List<Product> get _filteredProducts {
-    var list = widget.products;
+  List<Product> get _sortedProducts {
+    var list = widget.products.toList();
     if (_selectedCategory != 0 && _selectedCategory < _categories.length) {
       final cat = _categories[_selectedCategory];
       list = list.where((p) => p.category == cat).toList();
@@ -134,12 +178,24 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
               p.subtitle.toLowerCase().contains(_searchQuery.toLowerCase()))
           .toList();
     }
+    switch (_sortBy) {
+      case 'price_asc': list.sort((a, b) => a.price.compareTo(b.price)); break;
+      case 'price_desc': list.sort((a, b) => b.price.compareTo(a.price)); break;
+      case 'name': list.sort((a, b) => a.name.compareTo(b.name)); break;
+    }
     return list;
   }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, authState) {
+        if (authState is AuthAuthenticated) {
+          _loadFavorites();
+          _loadCartCount();
+        }
+      },
+      child: DefaultTabController(
       length: 3,
       child: Scaffold(
         backgroundColor: HColors.background,
@@ -213,9 +269,10 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
             ),
           ],
         ),
-        bottomNavigationBar: HeritageBottomNav(
+        bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
+          builder: (context, cartState) => HeritageBottomNav(
           currentIndex: _navIndex,
-          cartCount: _cartCount,
+          cartCount: cartState.cartCount,
           onTap: (i) {
             if (i == _navIndex) return;
             if (i == 0) context.go('/home');
@@ -225,13 +282,16 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
             if (i == 4) context.go('/nearby');
           },
         ),
+        ),
         floatingActionButton: _buildFilterFAB(),
       ),
-    );
+    ),
+    ); // BlocListener
   }
 
   Widget _buildProductsTab() {
-    return SingleChildScrollView(
+    return BlocBuilder<FavoritesCubit, FavoritesState>(
+      builder: (context, favState) => SingleChildScrollView(
       child: Column(
         children: [
           // Category Chips
@@ -271,7 +331,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
           // Featured Products Scroll (Horizontal)
           SizedBox(
             height: 320,
-            child: _filteredProducts.isEmpty
+            child: _sortedProducts.isEmpty
                 ? Center(
                     child: Text(
                       'No products found',
@@ -281,9 +341,9 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 : ListView.builder(
                     scrollDirection: Axis.horizontal,
                     padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _filteredProducts.take(3).length,
+                    itemCount: _sortedProducts.take(3).length,
                     itemBuilder: (context, index) {
-                      final product = _filteredProducts[index];
+                      final product = _sortedProducts[index];
                       return Padding(
                         padding: const EdgeInsets.only(right: 16),
                         child: SizedBox(
@@ -295,7 +355,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                             imageUrl: product.imageUrl,
                             price: product.price,
                             badge: product.badge,
-                            isFavorite: product.isFavorite,
+                            isFavorite: favState.favoriteIds.contains(product.id),
                             category: product.category,
                             onFavoriteToggle: () {
                               _handleFavoriteToggle(product);
@@ -320,11 +380,11 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 crossAxisCount: 2,
                 mainAxisSpacing: 16,
                 crossAxisSpacing: 16,
-                childAspectRatio: 0.62,
+                childAspectRatio: 0.72,
               ),
-              itemCount: _filteredProducts.length,
+              itemCount: _sortedProducts.length,
               itemBuilder: (context, index) {
-                final product = _filteredProducts[index];
+                final product = _sortedProducts[index];
                 return ProductCard(
                   id: product.id,
                   name: product.name,
@@ -332,7 +392,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                   imageUrl: product.imageUrl,
                   price: product.price,
                   badge: product.badge,
-                  isFavorite: product.isFavorite,
+                  isFavorite: favState.favoriteIds.contains(product.id),
                   category: product.category,
                   onFavoriteToggle: () {
                     _handleFavoriteToggle(product);
@@ -346,7 +406,8 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
-    );
+    ),
+    ); // BlocBuilder close
   }
 
   Widget _buildCollectionsTab() {
@@ -574,16 +635,44 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
 
   Widget _buildFilterFAB() {
     return FloatingActionButton.extended(
-      onPressed: () {},
+      onPressed: () {
+        showModalBottomSheet(
+          context: context,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (ctx) => Padding(
+            padding: const EdgeInsets.all(24),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text('Sort & Filter', style: HText.headlineMd),
+                const SizedBox(height: 16),
+                ListTile(
+                  leading: const Icon(Icons.attach_money),
+                  title: const Text('Price: Low to High'),
+                  onTap: () { setState(() => _sortBy = 'price_asc'); Navigator.pop(ctx); },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.money_off),
+                  title: const Text('Price: High to Low'),
+                  onTap: () { setState(() => _sortBy = 'price_desc'); Navigator.pop(ctx); },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.sort_by_alpha),
+                  title: const Text('Name: A to Z'),
+                  onTap: () { setState(() => _sortBy = 'name'); Navigator.pop(ctx); },
+                ),
+              ],
+            ),
+          ),
+        );
+      },
       backgroundColor: HColors.primaryContainer,
       foregroundColor: HColors.onPrimaryContainer,
       icon: const Icon(Icons.tune),
-      label: Text(
-        'Filter',
-        style: HText.labelLg.copyWith(
-          color: HColors.onPrimaryContainer,
-        ),
-      ),
+      label: Text('Sort', style: HText.labelLg.copyWith(color: HColors.onPrimaryContainer)),
     );
   }
 }

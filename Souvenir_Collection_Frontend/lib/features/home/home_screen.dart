@@ -22,6 +22,8 @@ import '../../blocs/artisans/artisan_bloc.dart';
 import '../../blocs/artisans/artisan_state.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_state.dart';
+import '../../blocs/cart/cart_cubit.dart';
+import '../../blocs/favorites/favorites_cubit.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<Product> products;
@@ -52,6 +54,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _categoriesLoading = true;
   bool _nearbyLoading = true;
   int _cartCount = 0;
+  String _sortBy = 'default'; // 'default', 'price_asc', 'price_desc', 'name'
 
   @override
   void initState() {
@@ -59,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
     _loadCategories();
     _loadNearbyShops();
     _loadCartCount();
+    _loadFavorites();
   }
 
   Future<void> _loadCategories() async {
@@ -67,7 +71,9 @@ class _HomeScreenState extends State<HomeScreen> {
       final cats = await productService.getCategories();
       if (mounted) {
         setState(() {
-          _categories = ['All', ...cats.map((c) => c['name']?.toString() ?? '')];
+          // Deduplicate categories
+          final names = cats.map((c) => c['name']?.toString() ?? '').where((n) => n.isNotEmpty).toSet().toList();
+          _categories = ['All', ...names];
           _categoriesLoading = false;
         });
       }
@@ -101,7 +107,24 @@ class _HomeScreenState extends State<HomeScreen> {
       if (authState is AuthAuthenticated) {
         final orderService = context.read<OrderService>();
         final count = await orderService.getCartCount(authState.user.id);
-        if (mounted) setState(() => _cartCount = count);
+        if (mounted) {
+          context.read<CartCubit>().setCount(count);
+          setState(() => _cartCount = count);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadFavorites() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        final favService = context.read<FavoritesService>();
+        final items = await favService.getFavoriteProducts(authState.user.id);
+        if (mounted) {
+          final ids = items.map((p) => p.id).toSet();
+          context.read<FavoritesCubit>().setFavorites(ids);
+        }
       }
     } catch (_) {}
   }
@@ -113,45 +136,70 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _handleFavoriteToggle(Product product) async {
     final userId = _currentUserId;
-    if (userId == null) return;
-
+    if (userId == null || userId.isEmpty) {
+      _showLoginPrompt();
+      return;
+    }
     try {
       final favService = context.read<FavoritesService>();
       final isNowFavorited = await favService.toggleFavorite(userId, product.id);
       if (mounted) {
-        setState(() {
-          product.isFavorite = isNowFavorited;
-        });
+        context.read<FavoritesCubit>().toggle(product.id);
+        setState(() => product.isFavorite = isNowFavorited);
         widget.onFavoriteToggle?.call(product);
-      }
-    } catch (_) {}
-  }
-
-  Future<void> _handleAddToCart(Product product) async {
-    final userId = _currentUserId;
-    if (userId == null) return;
-
-    try {
-      final orderService = context.read<OrderService>();
-      await orderService.addToCart(userId, product.id);
-      if (mounted) {
-        setState(() {
-          product.cartQty++;
-          _cartCount++;
-        });
-        widget.onAddToCart?.call(product);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('${product.name} added to cart'),
-            duration: const Duration(seconds: 2),
+            content: Text(isNowFavorited ? 'Added to favorites' : 'Removed from favorites'),
+            duration: const Duration(seconds: 1),
           ),
         );
       }
     } catch (_) {}
   }
 
+  Future<void> _handleAddToCart(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null || userId.isEmpty) {
+      _showLoginPrompt();
+      return;
+    }
+    try {
+      final orderService = context.read<OrderService>();
+      await orderService.addToCart(userId, product.id);
+      if (mounted) {
+        context.read<CartCubit>().increment();
+        setState(() => product.cartQty++);
+        widget.onAddToCart?.call(product);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.name} added to cart'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: HColors.success,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  void _showLoginPrompt() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign in required'),
+        content: const Text('Please sign in to add items to cart or favorites.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () { Navigator.pop(ctx); context.go('/login'); },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Product> get _filteredProducts {
-    var list = widget.products;
+    var list = widget.products.toList();
     if (_selectedCategory != 0 && _selectedCategory < _categories.length) {
       final cat = _categories[_selectedCategory];
       list = list.where((p) => p.category == cat).toList();
@@ -163,6 +211,12 @@ class _HomeScreenState extends State<HomeScreen> {
               p.subtitle.toLowerCase().contains(_searchQuery.toLowerCase()) ||
               p.category.toLowerCase().contains(_searchQuery.toLowerCase()))
           .toList();
+    }
+    // Sort
+    switch (_sortBy) {
+      case 'price_asc': list.sort((a, b) => a.price.compareTo(b.price)); break;
+      case 'price_desc': list.sort((a, b) => b.price.compareTo(a.price)); break;
+      case 'name': list.sort((a, b) => a.name.compareTo(b.name)); break;
     }
     return list;
   }
@@ -179,7 +233,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final showFiltered = _selectedCategory != 0 || _searchQuery.isNotEmpty;
     final displayProducts = showFiltered ? _filteredProducts : featured;
 
-    return Scaffold(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, authState) {
+        if (authState is AuthAuthenticated) {
+          _loadFavorites();
+          _loadCartCount();
+        }
+      },
+      child: Scaffold(
       appBar: HeritageAppBar(
         onSearch: () {
           setState(() {
@@ -192,9 +253,10 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       endDrawer: const AppSidebar(currentIndex: -1),
-      bottomNavigationBar: HeritageBottomNav(
+      bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
+        builder: (context, cartState) => HeritageBottomNav(
         currentIndex: _navIndex,
-        cartCount: _cartCount,
+        cartCount: cartState.cartCount,
         onTap: (i) {
           if (i == _navIndex) return;
           if (i == 0) context.go('/home');
@@ -203,6 +265,7 @@ class _HomeScreenState extends State<HomeScreen> {
           if (i == 3) context.go('/cart');
           if (i == 4) context.go('/nearby');
         },
+      ),
       ),
       body: CustomScrollView(
         slivers: [
@@ -232,7 +295,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
-    );
+    ),
+    ); // BlocListener
   }
 
   Widget _buildSearchBar() {
@@ -338,11 +402,26 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(title,
-              style: HText.headlineMd.copyWith(color: HColors.primary)),
-          if (subtitle != null)
-            Text(subtitle,
-                style: HText.labelSm.copyWith(color: HColors.outline)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: HText.headlineMd.copyWith(color: HColors.primary)),
+              if (subtitle != null)
+                Text(subtitle, style: HText.labelSm.copyWith(color: HColors.outline)),
+            ],
+          ),
+          PopupMenuButton<String>(
+            initialValue: _sortBy,
+            onSelected: (v) => setState(() => _sortBy = v),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'default', child: Text('Default')),
+              const PopupMenuItem(value: 'price_asc', child: Text('Price: Low→High')),
+              const PopupMenuItem(value: 'price_desc', child: Text('Price: High→Low')),
+              const PopupMenuItem(value: 'name', child: Text('Name A→Z')),
+            ],
+            child: const Icon(Icons.sort, color: HColors.primary),
+          ),
         ],
       ),
     );
@@ -355,46 +434,40 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(
           child: Column(
             children: [
-              const Icon(Icons.inventory_2_outlined,
-                  size: 48, color: HColors.outline),
+              const Icon(Icons.inventory_2_outlined, size: 48, color: HColors.outline),
               const SizedBox(height: 12),
-              Text('No items found',
-                  style: HText.bodyMd.copyWith(color: HColors.outline)),
+              Text('No items found', style: HText.bodyMd.copyWith(color: HColors.outline)),
             ],
           ),
         ),
       );
     }
-    return SizedBox(
-      height: 310,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: products.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 16),
-        itemBuilder: (ctx, i) {
-          final p = products[i];
-          return SizedBox(
-            width: 200,
-            child: ProductCard(
-              id: p.id,
-              name: p.name,
-              subtitle: p.subtitle,
-              imageUrl: '', // unused — image-free design
-              price: p.price,
-              badge: p.badge,
-              isFavorite: p.isFavorite,
-              category: p.category,
-              onFavoriteToggle: () {
-                _handleFavoriteToggle(p);
-              },
-              onAddToCart: () {
-                _handleAddToCart(p);
-              },
-            ),
-          );
-        },
-      ),
+    return BlocBuilder<FavoritesCubit, FavoritesState>(
+      builder: (context, favState) {
+        return SizedBox(
+          height: 320,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: products.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 16),
+            itemBuilder: (ctx, i) {
+              final p = products[i];
+              final isFav = favState.favoriteIds.contains(p.id);
+              return SizedBox(
+                width: 200,
+                child: ProductCard(
+                  id: p.id, name: p.name, subtitle: p.subtitle,
+                  imageUrl: p.imageUrl, price: p.price,
+                  badge: p.badge, isFavorite: isFav, category: p.category,
+                  onFavoriteToggle: () => _handleFavoriteToggle(p),
+                  onAddToCart: () => _handleAddToCart(p),
+                ),
+              );
+            },
+          ),
+        );
+      },
     );
   }
 
