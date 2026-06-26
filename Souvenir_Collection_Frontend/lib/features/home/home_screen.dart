@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -10,24 +11,28 @@ import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/category_chip.dart';
 import '../../core/widgets/product_card.dart';
 import '../../core/widgets/sidebar.dart';
-import '../../data/static_data.dart';
 import '../../models/artisan.dart';
 import '../../models/nearby_shop.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
+import '../../services/favorites_service.dart';
+import '../../services/order_service.dart';
+import '../../services/map_service.dart';
 import '../../blocs/artisans/artisan_bloc.dart';
 import '../../blocs/artisans/artisan_state.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_state.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<Product> products;
-  final void Function(Product) onFavoriteToggle;
-  final void Function(Product) onAddToCart;
+  final void Function(Product)? onFavoriteToggle;
+  final void Function(Product)? onAddToCart;
 
   const HomeScreen({
     super.key,
     required this.products,
-    required this.onFavoriteToggle,
-    required this.onAddToCart,
+    this.onFavoriteToggle,
+    this.onAddToCart,
   });
 
   @override
@@ -41,10 +46,114 @@ class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Data from API
+  List<String> _categories = ['All'];
+  List<NearbyShop> _nearbyShops = [];
+  bool _categoriesLoading = true;
+  bool _nearbyLoading = true;
+  int _cartCount = 0;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+    _loadNearbyShops();
+    _loadCartCount();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final productService = context.read<ProductService>();
+      final cats = await productService.getCategories();
+      if (mounted) {
+        setState(() {
+          _categories = ['All', ...cats.map((c) => c['name']?.toString() ?? '')];
+          _categoriesLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _categoriesLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadNearbyShops() async {
+    try {
+      final mapService = context.read<MapService>();
+      final shops = await mapService.getBranches();
+      if (mounted) {
+        setState(() {
+          _nearbyShops = shops;
+          _nearbyLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _nearbyLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadCartCount() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        final orderService = context.read<OrderService>();
+        final count = await orderService.getCartCount(authState.user.id);
+        if (mounted) setState(() => _cartCount = count);
+      }
+    } catch (_) {}
+  }
+
+  String? get _currentUserId {
+    final state = context.read<AuthBloc>().state;
+    return state is AuthAuthenticated ? state.user.id : null;
+  }
+
+  Future<void> _handleFavoriteToggle(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
+    try {
+      final favService = context.read<FavoritesService>();
+      final isNowFavorited = await favService.toggleFavorite(userId, product.id);
+      if (mounted) {
+        setState(() {
+          product.isFavorite = isNowFavorited;
+        });
+        widget.onFavoriteToggle?.call(product);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleAddToCart(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+
+    try {
+      final orderService = context.read<OrderService>();
+      await orderService.addToCart(userId, product.id);
+      if (mounted) {
+        setState(() {
+          product.cartQty++;
+          _cartCount++;
+        });
+        widget.onAddToCart?.call(product);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.name} added to cart'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
   List<Product> get _filteredProducts {
     var list = widget.products;
-    if (_selectedCategory != 0) {
-      final cat = StaticData.categories[_selectedCategory];
+    if (_selectedCategory != 0 && _selectedCategory < _categories.length) {
+      final cat = _categories[_selectedCategory];
       list = list.where((p) => p.category == cat).toList();
     }
     if (_searchQuery.isNotEmpty) {
@@ -85,14 +194,14 @@ class _HomeScreenState extends State<HomeScreen> {
       endDrawer: const AppSidebar(currentIndex: -1),
       bottomNavigationBar: HeritageBottomNav(
         currentIndex: _navIndex,
-        cartCount: ProductService.cartCount,
+        cartCount: _cartCount,
         onTap: (i) {
           if (i == _navIndex) return;
-          if (i == 0) Navigator.pushReplacementNamed(context, '/home');
-          if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
-          if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
-          if (i == 3) Navigator.pushReplacementNamed(context, '/cart');
-          if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
+          if (i == 0) context.go('/home');
+          if (i == 1) context.go('/shop');
+          if (i == 2) context.go('/saved');
+          if (i == 3) context.go('/cart');
+          if (i == 4) context.go('/nearby');
         },
       ),
       body: CustomScrollView(
@@ -163,15 +272,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryRow() {
+    if (_categoriesLoading && _categories.length <= 1) {
+      return const SizedBox(
+        height: 42,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
     return SizedBox(
       height: 42,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: StaticData.categories.length,
+        itemCount: _categories.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) => CategoryChip(
-          label: StaticData.categories[i],
+          label: _categories[i],
           selected: i == _selectedCategory,
           onTap: () => setState(() => _selectedCategory = i),
         ),
@@ -271,20 +386,10 @@ class _HomeScreenState extends State<HomeScreen> {
               isFavorite: p.isFavorite,
               category: p.category,
               onFavoriteToggle: () {
-                setState(() {
-                  widget.onFavoriteToggle(p);
-                });
+                _handleFavoriteToggle(p);
               },
               onAddToCart: () {
-                setState(() {
-                  widget.onAddToCart(p);
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${p.name} added to cart'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
+                _handleAddToCart(p);
               },
             ),
           );
@@ -390,15 +495,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNearbyShops() {
+    if (_nearbyLoading && _nearbyShops.isEmpty) {
+      return const SizedBox(
+        height: 170,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (_nearbyShops.isEmpty) {
+      return const SizedBox(
+        height: 170,
+        child: Center(
+          child: Text('No nearby shops found',
+              style: TextStyle(color: HColors.outline)),
+        ),
+      );
+    }
     return SizedBox(
       height: 170,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: StaticData.nearbyShops.length,
+        itemCount: _nearbyShops.length,
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (ctx, i) =>
-            _NearbyShopCard(shop: StaticData.nearbyShops[i]),
+            _NearbyShopCard(shop: _nearbyShops[i]),
       ),
     );
   }
@@ -508,7 +628,7 @@ class _HeroSection extends StatelessWidget {
                   const SizedBox(height: 18),
                   ElevatedButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, '/shop');
+                      context.go('/shop');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: HColors.primaryContainer,
@@ -683,26 +803,27 @@ class _NearbyShopCard extends StatelessWidget {
                     const Icon(Icons.store, color: HColors.primary, size: 20),
               ),
               const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: HColors.primaryContainer.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(999),
+              if (shop.rating > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: HColors.primaryContainer.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, size: 12, color: HColors.primary),
+                      const SizedBox(width: 3),
+                      Text(shop.rating.toString(),
+                          style: HText.labelSm.copyWith(
+                              color: HColors.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11)),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star, size: 12, color: HColors.primary),
-                    const SizedBox(width: 3),
-                    Text(shop.rating.toString(),
-                        style: HText.labelSm.copyWith(
-                            color: HColors.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11)),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -714,16 +835,17 @@ class _NearbyShopCard extends StatelessWidget {
           Text(shop.type,
               style: HText.labelSm.copyWith(color: HColors.outline)),
           const Spacer(),
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 13, color: HColors.secondary),
-              const SizedBox(width: 4),
-              Text(shop.distance,
-                  style: HText.labelSm.copyWith(
-                      color: HColors.secondary, fontSize: 10)),
-            ],
-          ),
+          if (shop.distance.isNotEmpty)
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined,
+                    size: 13, color: HColors.secondary),
+                const SizedBox(width: 4),
+                Text(shop.distance,
+                    style: HText.labelSm.copyWith(
+                        color: HColors.secondary, fontSize: 10)),
+              ],
+            ),
         ],
       ),
     );

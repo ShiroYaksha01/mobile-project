@@ -53,7 +53,7 @@ class _LoginScreenState extends State<LoginScreen> {
         } else if (state is AuthAuthenticated) {
           // If login is successful, router will automatically redirect to home,
           // but we can explicitly go there.
-          context.go('/');
+          context.go('/home');
         }
       },
       builder: (context, state) {
@@ -158,20 +158,6 @@ class _LoginScreenState extends State<LoginScreen> {
                       ),
                       
                       const SizedBox(height: 16),
-                      
-                      TextButton(
-                        onPressed: () {
-                          // Allow browsing as guest
-                          context.go('/');
-                        },
-                        child: Text(
-                          'Continue as Guest',
-                          style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                            color: AppColors.textSecondaryLight,
-                            decoration: TextDecoration.underline,
-                          ),
-                        ),
-                      ),
                     ],
                   ),
                 ),

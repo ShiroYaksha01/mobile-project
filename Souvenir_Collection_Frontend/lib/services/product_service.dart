@@ -1,4 +1,3 @@
-import '../data/static_data.dart';
 import '../models/product.dart';
 import 'api_client.dart';
 
@@ -6,6 +5,8 @@ class ProductService {
   final ApiClient _apiClient;
 
   ProductService(this._apiClient);
+
+  // ─── Products ───────────────────────────────────────────────
 
   Future<List<Product>> getAllProducts() async {
     try {
@@ -20,19 +21,72 @@ class ProductService {
     }
   }
 
-  static List<Product> get favorites =>
-      StaticData.products.where((p) => p.isFavorite).toList();
+  Future<Product> getProductById(String id) async {
+    try {
+      final response = await _apiClient.get('/products/$id');
+      if (response.statusCode == 200) {
+        return Product.fromJson(response.data['data']);
+      }
+      throw Exception('Failed to load product');
+    } catch (e) {
+      throw Exception('Failed to load product: $e');
+    }
+  }
 
-  static List<Product> get cartItems =>
-      StaticData.products.where((p) => p.cartQty > 0).toList();
+  Future<List<Product>> getProductsByCategory(String categoryId) async {
+    try {
+      final response = await _apiClient.get('/products/category/$categoryId');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => Product.fromJson(json)).toList();
+      }
+      throw Exception('Failed to load products by category');
+    } catch (e) {
+      throw Exception('Failed to load products by category: $e');
+    }
+  }
 
-  static int get cartCount => cartItems.length;
+  Future<List<Product>> getProductsByArtisan(String artisanId) async {
+    try {
+      final response = await _apiClient.get('/products/artisan/$artisanId');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => Product.fromJson(json)).toList();
+      }
+      throw Exception('Failed to load products by artisan');
+    } catch (e) {
+      throw Exception('Failed to load products by artisan: $e');
+    }
+  }
 
-  static void toggleFavorite(String id) {
-    final product = StaticData.products.firstWhere(
-          (p) => p.id == id,
-    );
+  Future<List<Product>> searchProducts(String query) async {
+    try {
+      final response = await _apiClient.get(
+        '/products/search',
+        queryParameters: {'query': query},
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'];
+        return data.map((json) => Product.fromJson(json)).toList();
+      }
+      throw Exception('Failed to search products');
+    } catch (e) {
+      throw Exception('Failed to search products: $e');
+    }
+  }
 
-    product.isFavorite = !product.isFavorite;
+  // ─── Categories ─────────────────────────────────────────────
+
+  Future<List<Map<String, dynamic>>> getCategories() async {
+    try {
+      final response = await _apiClient.get('/categories');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'];
+        return data.cast<Map<String, dynamic>>();
+      }
+      throw Exception('Failed to load categories');
+    } catch (e) {
+      throw Exception('Failed to load categories: $e');
+    }
   }
 }

@@ -2,3 +2,6 @@
 skills-lock.json
 .agents/
 **/.agents/
+CLAUDE.md
+.env
+screenshot_*.png

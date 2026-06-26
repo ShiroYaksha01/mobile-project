@@ -1,14 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 
 class LandingScreen extends StatefulWidget {
-  final VoidCallback onBeginJourney;
-
-  const LandingScreen({
-    super.key,
-    required this.onBeginJourney,
-  });
+  const LandingScreen({super.key});
 
   @override
   State<LandingScreen> createState() => _LandingScreenState();
@@ -41,7 +37,7 @@ class _LandingScreenState extends State<LandingScreen> {
                   ),
                   GestureDetector(
                     onTap: () {
-                      Navigator.pushNamed(context, '/login');
+                      context.go('/login');
                     },
                     child: Text(
                       'Sign In',
@@ -108,12 +104,13 @@ class _LandingScreenState extends State<LandingScreen> {
                           maxLines: 2,
                         ),
                         const SizedBox(height: 32),
-                        Row(
+                        Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Primary CTA Button
                             ElevatedButton.icon(
                               onPressed: () {
-                                Navigator.pushNamed(context, '/login');
+                                context.go('/login');
                               },
                               icon: const Icon(Icons.arrow_forward, size: 18),
                               label: Text(
@@ -136,11 +133,11 @@ class _LandingScreenState extends State<LandingScreen> {
                                 elevation: 8,
                               ),
                             ),
-                            const SizedBox(width: 16),
+                            const SizedBox(height: 12),
                             // Secondary Link
                             GestureDetector(
                               onTap: () {
-                                Navigator.pushNamed(context, '/login');
+                                context.go('/login');
                               },
                               child: Text(
                                 'Already have an account? Sign In',
@@ -180,7 +177,7 @@ class _LandingScreenState extends State<LandingScreen> {
                         const SizedBox(height: 16),
                         ElevatedButton(
                           onPressed: () {
-                            Navigator.pushNamed(context, '/login');
+                            context.go('/login');
                           },
                           style: ElevatedButton.styleFrom(
                             backgroundColor: HColors.primary,

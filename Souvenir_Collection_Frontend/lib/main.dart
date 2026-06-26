@@ -6,6 +6,9 @@ import 'services/api_client.dart';
 import 'services/auth_service.dart';
 import 'services/product_service.dart';
 import 'services/artisan_service.dart';
+import 'services/favorites_service.dart';
+import 'services/order_service.dart';
+import 'services/map_service.dart';
 import 'blocs/auth/auth_bloc.dart';
 import 'blocs/auth/auth_event.dart';
 import 'blocs/products/product_bloc.dart';
@@ -31,6 +34,9 @@ class _SouvenirAppState extends State<SouvenirApp> {
   late final AuthService authService;
   late final ProductService productService;
   late final ArtisanService artisanService;
+  late final FavoritesService favoritesService;
+  late final OrderService orderService;
+  late final MapService mapService;
   late final AuthBloc authBloc;
   late final ProductBloc productBloc;
   late final ArtisanBloc artisanBloc;
@@ -44,7 +50,10 @@ class _SouvenirAppState extends State<SouvenirApp> {
     authService = AuthService(apiClient);
     productService = ProductService(apiClient);
     artisanService = ArtisanService(apiClient);
-    
+    favoritesService = FavoritesService(apiClient);
+    orderService = OrderService(apiClient);
+    mapService = MapService(apiClient);
+
     // Initialize blocs
     authBloc = AuthBloc(authService: authService);
     productBloc = ProductBloc(productService: productService);
@@ -54,7 +63,7 @@ class _SouvenirAppState extends State<SouvenirApp> {
     authBloc.add(AuthCheckRequested());
     productBloc.add(LoadProductsRequested());
     artisanBloc.add(LoadArtisansRequested());
-    
+
     // Initialize Router
     appRouter = AppRouter(authBloc);
   }
@@ -69,20 +78,28 @@ class _SouvenirAppState extends State<SouvenirApp> {
 
   @override
   Widget build(BuildContext context) {
-    // Provide the Blocs globally at the root
-    return MultiBlocProvider(
+    // Provide services and blocs globally at the root
+    return MultiRepositoryProvider(
       providers: [
-        BlocProvider<AuthBloc>.value(value: authBloc),
-        BlocProvider<ProductBloc>.value(value: productBloc),
-        BlocProvider<ArtisanBloc>.value(value: artisanBloc),
+        RepositoryProvider<FavoritesService>.value(value: favoritesService),
+        RepositoryProvider<OrderService>.value(value: orderService),
+        RepositoryProvider<MapService>.value(value: mapService),
+        RepositoryProvider<ProductService>.value(value: productService),
       ],
-      child: MaterialApp.router(
-        title: 'Khmer Souvenirs',
-        theme: buildAppTheme(),
-        darkTheme: buildDarkTheme(),
-        themeMode: ThemeMode.system,
-        routerConfig: appRouter.router,
-        debugShowCheckedModeBanner: false,
+      child: MultiBlocProvider(
+        providers: [
+          BlocProvider<AuthBloc>.value(value: authBloc),
+          BlocProvider<ProductBloc>.value(value: productBloc),
+          BlocProvider<ArtisanBloc>.value(value: artisanBloc),
+        ],
+        child: MaterialApp.router(
+          title: 'Khmer Souvenirs',
+          theme: buildAppTheme(),
+          darkTheme: buildDarkTheme(),
+          themeMode: ThemeMode.system,
+          routerConfig: appRouter.router,
+          debugShowCheckedModeBanner: false,
+        ),
       ),
     );
   }

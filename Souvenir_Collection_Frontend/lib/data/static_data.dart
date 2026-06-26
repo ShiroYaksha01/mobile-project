@@ -49,10 +49,10 @@ class StaticData {
   ];
 
   static const List<NearbyShop> nearbyShops = [
-    NearbyShop(name: 'Silk Studio',   type: 'Textile',      rating: 4.9, distance: '0.3 km', mapX: 0.35, mapY: 0.40),
-    NearbyShop(name: 'Ceramics Co.',  type: 'Pottery',      rating: 4.7, distance: '0.6 km', mapX: 0.60, mapY: 0.60),
-    NearbyShop(name: 'Jewelry Arts',  type: 'Silver & Gold', rating: 4.8, distance: '1.1 km', mapX: 0.75, mapY: 0.25),
-    NearbyShop(name: 'Wood Carvers',  type: 'Woodwork',     rating: 4.6, distance: '1.4 km', mapX: 0.45, mapY: 0.82),
-    NearbyShop(name: 'Kbach Gallery', type: 'Mixed Craft',  rating: 4.9, distance: '0.8 km', mapX: 0.15, mapY: 0.75),
+    NearbyShop(id: 's1', name: 'Silk Studio',   type: 'Textile',      rating: 4.9, distance: '0.3 km'),
+    NearbyShop(id: 's2', name: 'Ceramics Co.',  type: 'Pottery',      rating: 4.7, distance: '0.6 km'),
+    NearbyShop(id: 's3', name: 'Jewelry Arts',  type: 'Silver & Gold', rating: 4.8, distance: '1.1 km'),
+    NearbyShop(id: 's4', name: 'Wood Carvers',  type: 'Woodwork',     rating: 4.6, distance: '1.4 km'),
+    NearbyShop(id: 's5', name: 'Kbach Gallery', type: 'Mixed Craft',  rating: 4.9, distance: '0.8 km'),
   ];
 }
