@@ -18,6 +18,16 @@ import '../features/map/nearby_screen.dart';
 import '../features/profile/profile_screen.dart';
 import '../features/about/about_screen.dart';
 import '../features/help/help_screen.dart';
+
+// Person B screens
+import '../features/explore/explore_screen.dart';
+import '../features/explore/collection_detail_screen.dart';
+import '../features/map/map_screen.dart';
+import '../features/reviews/reviews_screen.dart';
+import '../features/quiz/gift_finder_quiz_screen.dart';
+import '../features/promotions/promotions_screen.dart';
+import '../features/media/media_screen.dart';
+
 import 'user_shell.dart';
 
 class AppRouter {
@@ -86,7 +96,7 @@ class AppRouter {
       ),
       GoRoute(
         path: '/settings',
-        builder: (context, state) => const ProfileScreen(), // reuse for now
+        builder: (context, state) => const ProfileScreen(),
       ),
       GoRoute(
         path: '/about',
@@ -95,6 +105,42 @@ class AppRouter {
       GoRoute(
         path: '/help',
         builder: (context, state) => const HelpScreen(),
+      ),
+
+      // ── Person B: Explore & Discovery routes ──────────────
+      GoRoute(
+        path: '/explore',
+        builder: (context, state) => const ExploreScreen(),
+      ),
+      GoRoute(
+        path: '/collection/:collectionId',
+        builder: (context, state) {
+          final collectionId = state.pathParameters['collectionId']!;
+          return CollectionDetailScreen(collectionId: collectionId);
+        },
+      ),
+      GoRoute(
+        path: '/map',
+        builder: (context, state) => const MapScreen(),
+      ),
+      GoRoute(
+        path: '/reviews/:productId',
+        builder: (context, state) {
+          final productId = state.pathParameters['productId']!;
+          return ReviewsScreen(productId: productId);
+        },
+      ),
+      GoRoute(
+        path: '/quiz',
+        builder: (context, state) => const GiftFinderQuizScreen(),
+      ),
+      GoRoute(
+        path: '/promotions',
+        builder: (context, state) => const PromotionsScreen(),
+      ),
+      GoRoute(
+        path: '/media',
+        builder: (context, state) => const MediaScreen(),
       ),
 
       // ── Main tabbed shell (requires login) ─────────────────

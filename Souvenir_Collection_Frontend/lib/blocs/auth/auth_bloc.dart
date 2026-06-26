@@ -40,6 +40,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
     try {
       final user = await _authService.login(event.email, event.password);
       emit(AuthAuthenticated(user));
+      // Fetch full profile to get user ID (login response may not include it)
+      final fullUser = await _authService.getCurrentUser();
+      if (fullUser != null) {
+        emit(AuthAuthenticated(fullUser));
+      }
     } catch (e) {
       emit(AuthFailure(e.toString().replaceAll('Exception: ', '')));
       emit(AuthUnauthenticated());
@@ -59,6 +64,11 @@ class AuthBloc extends Bloc<AuthEvent, AuthState> {
         event.password,
       );
       emit(AuthAuthenticated(user));
+      // Fetch full profile to get user ID
+      final fullUser = await _authService.getCurrentUser();
+      if (fullUser != null) {
+        emit(AuthAuthenticated(fullUser));
+      }
     } catch (e) {
       emit(AuthFailure(e.toString().replaceAll('Exception: ', '')));
       emit(AuthUnauthenticated());

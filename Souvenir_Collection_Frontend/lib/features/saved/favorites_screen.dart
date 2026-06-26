@@ -169,7 +169,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       crossAxisCount: 2,
                       crossAxisSpacing: 16,
                       mainAxisSpacing: 16,
-                      childAspectRatio: 0.62,
+                      childAspectRatio: 0.72,
                     ),
                   ),
                 ),

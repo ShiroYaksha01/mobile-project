@@ -14,6 +14,11 @@ class AppSidebar extends StatelessWidget {
   final VoidCallback? onAbout;
   final VoidCallback? onHelp;
   final VoidCallback? onLogout;
+  final VoidCallback? onExplore;
+  final VoidCallback? onMap;
+  final VoidCallback? onQuiz;
+  final VoidCallback? onPromotions;
+  final VoidCallback? onMedia;
   final int currentIndex;
 
   const AppSidebar({
@@ -23,6 +28,11 @@ class AppSidebar extends StatelessWidget {
     this.onAbout,
     this.onHelp,
     this.onLogout,
+    this.onExplore,
+    this.onMap,
+    this.onQuiz,
+    this.onPromotions,
+    this.onMedia,
     this.currentIndex = -1,
   });
 
@@ -49,6 +59,13 @@ class AppSidebar extends StatelessWidget {
                   title: "Profile",
                   selected: currentIndex == 5,
                   onTap: onProfile ?? () => context.go('/profile'),
+                ),
+                _DrawerItem(
+                  icon: Icons.card_giftcard_outlined,
+                  selectedIcon: Icons.card_giftcard,
+                  title: "Gift Finder",
+                  selected: currentIndex == 12,
+                  onTap: onQuiz ?? () => context.go('/quiz'),
                 ),
                 _DrawerItem(
                   icon: Icons.settings_outlined,
