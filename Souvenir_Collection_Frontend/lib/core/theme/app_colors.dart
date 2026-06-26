@@ -33,3 +33,44 @@ class AppColors {
   static const success = Color(0xFF388E3C);
   static const warning = Color(0xFFF57C00);
 }
+
+/// Material-3 semantic color aliases used by the UI layer.
+class HColors {
+  HColors._();
+
+  // Primary
+  static const primary = AppColors.primary;
+  static const primaryContainer = AppColors.primaryLight;
+  static const onPrimaryContainer = AppColors.surfaceLight;
+  static const primaryFixed = AppColors.primaryLight;
+  static const primaryFixedDim = AppColors.primary;
+
+  // Secondary
+  static const secondary = AppColors.secondary;
+  static const secondaryContainer = AppColors.secondaryLight;
+  static const onSecondary = AppColors.textPrimaryLight;
+  static const onSecondaryContainer = AppColors.textPrimaryLight;
+
+  // Tertiary
+  static const tertiary = AppColors.primaryDark;
+
+  // Status
+  static const error = AppColors.error;
+  static const success = AppColors.success;
+
+  // Surface hierarchy
+  static const background = AppColors.backgroundLight;
+  static const onBackground = AppColors.textPrimaryLight;
+  static const surface = AppColors.surfaceLight;
+  static const onSurface = AppColors.textPrimaryLight;
+  static const onSurfaceVariant = AppColors.textSecondaryLight;
+  static const surfaceContainer = AppColors.surfaceVariantLight;
+  static const surfaceContainerLow = Color(0xFFF8F6F3);
+  static const surfaceContainerLowest = AppColors.surfaceLight;
+  static const surfaceContainerHigh = Color(0xFFEBE8E5);
+  static const surfaceContainerHighest = Color(0xFFE5E2DF);
+
+  // Outline
+  static const outline = AppColors.textSecondaryLight;
+  static const outlineVariant = Color(0xFFD1C7BD);
+}

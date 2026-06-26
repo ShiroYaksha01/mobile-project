@@ -82,7 +82,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         npgsqlOptions.MapEnum<DiscountType>("discount_type", nameTranslator: translator);
         npgsqlOptions.MapEnum<PromotionStatus>("promotion_status", nameTranslator: translator);
     })
-    .UseSnakeCaseNamingConvention());
+    );
 
 // Services
 builder.Services.AddHttpClient(); // needed by AuthService for Google token verification

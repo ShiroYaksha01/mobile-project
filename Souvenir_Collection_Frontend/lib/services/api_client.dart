@@ -1,5 +1,6 @@
 import 'package:dio/dio.dart';
 import 'auth_interceptor.dart';
+import 'api_key_interceptor.dart';
 
 class ApiClient {
   late final Dio _dio;
@@ -9,7 +10,7 @@ class ApiClient {
       BaseOptions(
         // Replace with your actual backend URL when running locally or in production
         // For Android emulator: 10.0.2.2. For iOS Simulator: localhost
-        baseUrl: 'http://localhost:5000/api', 
+        baseUrl: 'http://127.0.0.1:5248/api',
         connectTimeout: const Duration(seconds: 15),
         receiveTimeout: const Duration(seconds: 15),
         headers: {
@@ -20,8 +21,9 @@ class ApiClient {
     );
 
     // Add interceptors
+    _dio.interceptors.add(ApiKeyInterceptor());
     _dio.interceptors.add(AuthInterceptor());
-    
+
     // Add logging interceptor during development
     _dio.interceptors.add(LogInterceptor(
       request: true,
@@ -46,6 +48,11 @@ class ApiClient {
   // Generic PUT request
   Future<Response> put(String path, {dynamic data}) async {
     return await _dio.put(path, data: data);
+  }
+
+  // Generic PATCH request
+  Future<Response> patch(String path, {dynamic data}) async {
+    return await _dio.patch(path, data: data);
   }
 
   // Generic DELETE request

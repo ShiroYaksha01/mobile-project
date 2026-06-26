@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_bar.dart';
 import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/sidebar.dart';
-import '../../data/static_data.dart';
+import '../../models/product.dart';
+import '../../services/order_service.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_state.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -16,13 +21,70 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final int _navIndex = 3;
+  List<Product> _cartItems = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCart();
+  }
+
+  String? get _currentUserId {
+    final state = context.read<AuthBloc>().state;
+    return state is AuthAuthenticated ? state.user.id : null;
+  }
+
+  Future<void> _loadCart() async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final orderService = context.read<OrderService>();
+      final items = await orderService.getCartItems(userId);
+      if (mounted) setState(() { _cartItems = items; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updateQuantity(Product product, int delta) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    final newQty = product.cartQty + delta;
+    try {
+      final orderService = context.read<OrderService>();
+      if (newQty <= 0) {
+        await orderService.removeItem(userId, product.id);
+        if (mounted) {
+          setState(() {
+            _cartItems.removeWhere((p) => p.id == product.id);
+          });
+        }
+      } else {
+        await orderService.updateQuantity(userId, product.id, newQty);
+        if (mounted) {
+          setState(() {
+            product.cartQty = newQty;
+          });
+        }
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cartItems =
-        StaticData.products.where((p) => p.cartQty > 0).toList();
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: HColors.background,
+        appBar: const HeritageAppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    final total = cartItems.fold<double>(
+    final total = _cartItems.fold<double>(
       0,
       (sum, item) => sum + item.price * item.cartQty,
     );
@@ -33,19 +95,19 @@ class _CartScreenState extends State<CartScreen> {
       endDrawer: const AppSidebar(currentIndex: -1),
       bottomNavigationBar: HeritageBottomNav(
         currentIndex: _navIndex,
-        cartCount: cartItems.length,
+        cartCount: _cartItems.length,
         onTap: (i) {
           if (i == _navIndex) return;
-          if (i == 0) Navigator.pushReplacementNamed(context, '/home');
-          if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
-          if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
+          if (i == 0) context.go('/home');
+          if (i == 1) context.go('/shop');
+          if (i == 2) context.go('/saved');
           if (i == 3) {
             // Already here
           }
-          if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
+          if (i == 4) context.go('/nearby');
         },
       ),
-      body: cartItems.isEmpty
+      body: _cartItems.isEmpty
           ? const _EmptyCart()
           : Column(
               children: [
@@ -64,7 +126,7 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '${cartItems.length} handcrafted pieces selected',
+                                '${_cartItems.length} handcrafted pieces selected',
                                 style: HText.bodyMd.copyWith(
                                   color: HColors.onSurfaceVariant,
                                 ),
@@ -78,14 +140,15 @@ class _CartScreenState extends State<CartScreen> {
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
-                              final product = cartItems[index];
-
+                              final product = _cartItems[index];
                               return _CartItemCard(
                                 product: product,
                                 onUpdate: () => setState(() {}),
+                                onIncrement: () => _updateQuantity(product, 1),
+                                onDecrement: () => _updateQuantity(product, -1),
                               );
                             },
-                            childCount: cartItems.length,
+                            childCount: _cartItems.length,
                           ),
                         ),
                       ),
@@ -174,12 +237,16 @@ class _CartScreenState extends State<CartScreen> {
 }
 
 class _CartItemCard extends StatelessWidget {
-  final dynamic product;
+  final Product product;
   final VoidCallback onUpdate;
+  final VoidCallback onIncrement;
+  final VoidCallback onDecrement;
 
   const _CartItemCard({
     required this.product,
     required this.onUpdate,
+    required this.onIncrement,
+    required this.onDecrement,
   });
 
   @override
@@ -250,7 +317,7 @@ class _CartItemCard extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () {
-                  product.cartQty++;
+                  onIncrement();
                   onUpdate();
                 },
                 child: Container(
@@ -274,7 +341,7 @@ class _CartItemCard extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   if (product.cartQty > 0) {
-                    product.cartQty--;
+                    onDecrement();
                     onUpdate();
                   }
                 },
@@ -334,7 +401,7 @@ class _EmptyCart extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/shop'),
+              onPressed: () => context.go('/shop'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: HColors.primary,
                 foregroundColor: Colors.white,

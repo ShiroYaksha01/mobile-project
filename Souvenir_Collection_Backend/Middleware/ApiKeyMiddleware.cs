@@ -17,7 +17,8 @@ namespace Sovenire_Collenction_Backend.Middleware
         {
             // 1. Bypass verification for Swagger documentation, root path, and SignalR hubs
             var path = context.Request.Path.Value ?? "";
-            if (path.StartsWith("/swagger") || path == "/" || path.Contains("/chatHub"))
+            // Also bypass OPTIONS (CORS preflight) requests
+            if (path.StartsWith("/swagger") || path == "/" || path.Contains("/chatHub") || context.Request.Method == "OPTIONS")
             {
                 await _next(context);
                 return;

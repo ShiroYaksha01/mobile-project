@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_bar.dart';
 import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/sidebar.dart';
-import '../../data/static_data.dart';
+import '../../models/nearby_shop.dart';
+import '../../services/map_service.dart';
 
 class NearbyScreen extends StatefulWidget {
   const NearbyScreen({super.key});
@@ -16,11 +19,27 @@ class NearbyScreen extends StatefulWidget {
 
 class _NearbyScreenState extends State<NearbyScreen> {
   final int _navIndex = 4;
+  List<NearbyShop> _shops = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadBranches();
+  }
+
+  Future<void> _loadBranches() async {
+    try {
+      final mapService = context.read<MapService>();
+      final shops = await mapService.getBranches();
+      if (mounted) setState(() { _shops = shops; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final shops = StaticData.nearbyShops;
-
     return Scaffold(
       backgroundColor: HColors.background,
       appBar: const HeritageAppBar(),
@@ -29,62 +48,70 @@ class _NearbyScreenState extends State<NearbyScreen> {
         currentIndex: _navIndex,
         onTap: (i) {
           if (i == _navIndex) return;
-          if (i == 0) Navigator.pushReplacementNamed(context, '/home');
-          if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
-          if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
-          if (i == 3) Navigator.pushReplacementNamed(context, '/cart');
+          if (i == 0) context.go('/home');
+          if (i == 1) context.go('/shop');
+          if (i == 2) context.go('/saved');
+          if (i == 3) context.go('/cart');
           if (i == 4) {
             // Already here
           }
         },
       ),
-      body: CustomScrollView(
-        slivers: [
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Nearby Ateliers',
-                    style: HText.headlineLg,
-                  ),
-                  const SizedBox(height: 6),
-                  Text(
-                    'Discover master artisans in your vicinity',
-                    style: HText.bodyMd.copyWith(
-                      color: HColors.onSurfaceVariant,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : CustomScrollView(
+              slivers: [
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'Nearby Ateliers',
+                          style: HText.headlineLg,
+                        ),
+                        const SizedBox(height: 6),
+                        Text(
+                          'Discover master artisans in your vicinity',
+                          style: HText.bodyMd.copyWith(
+                            color: HColors.onSurfaceVariant,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                ],
-              ),
+                ),
+                SliverPadding(
+                  padding: const EdgeInsets.all(20),
+                  sliver: _shops.isEmpty
+                      ? const SliverToBoxAdapter(
+                          child: Center(
+                            child: Text('No nearby shops found',
+                                style: TextStyle(color: HColors.outline)),
+                          ),
+                        )
+                      : SliverList(
+                          delegate: SliverChildBuilderDelegate(
+                            (context, index) {
+                              final shop = _shops[index];
+                              return _ShopCard(shop: shop);
+                            },
+                            childCount: _shops.length,
+                          ),
+                        ),
+                ),
+                const SliverToBoxAdapter(
+                  child: SizedBox(height: 32),
+                ),
+              ],
             ),
-          ),
-          SliverPadding(
-            padding: const EdgeInsets.all(20),
-            sliver: SliverList(
-              delegate: SliverChildBuilderDelegate(
-                (context, index) {
-                  final shop = shops[index];
-
-                  return _ShopCard(shop: shop);
-                },
-                childCount: shops.length,
-              ),
-            ),
-          ),
-          const SliverToBoxAdapter(
-            child: SizedBox(height: 32),
-          ),
-        ],
-      ),
     );
   }
 }
 
 class _ShopCard extends StatelessWidget {
-  final dynamic shop; // NearbyShop model
+  final NearbyShop shop;
 
   const _ShopCard({required this.shop});
 
@@ -139,58 +166,65 @@ class _ShopCard extends StatelessWidget {
                     color: HColors.onSurfaceVariant,
                   ),
                 ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    const Icon(
-                      Icons.location_on_outlined,
-                      size: 14,
-                      color: HColors.secondary,
-                    ),
-                    const SizedBox(width: 4),
-                    Text(
-                      shop.distance,
-                      style: HText.labelSm.copyWith(
+                if (shop.address.isNotEmpty) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.location_on_outlined,
+                        size: 14,
                         color: HColors.secondary,
                       ),
-                    ),
-                  ],
-                ),
+                      const SizedBox(width: 4),
+                      Expanded(
+                        child: Text(
+                          shop.address,
+                          style: HText.labelSm.copyWith(
+                            color: HColors.secondary,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ],
             ),
           ),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.end,
-            children: [
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                decoration: BoxDecoration(
-                  color: HColors.primaryContainer.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(99),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star, size: 14, color: HColors.primary),
-                    const SizedBox(width: 4),
-                    Text(
-                      shop.rating.toString(),
-                      style: HText.labelSm.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: HColors.primary,
+          if (shop.rating > 0)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.end,
+              children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: HColors.primaryContainer.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(99),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, size: 14, color: HColors.primary),
+                      const SizedBox(width: 4),
+                      Text(
+                        shop.rating.toString(),
+                        style: HText.labelSm.copyWith(
+                          fontWeight: FontWeight.bold,
+                          color: HColors.primary,
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 12),
-              Icon(
-                Icons.arrow_forward_ios,
-                size: 14,
-                color: HColors.outline.withValues(alpha: 0.5),
-              ),
-            ],
-          ),
+                const SizedBox(height: 12),
+                Icon(
+                  Icons.arrow_forward_ios,
+                  size: 14,
+                  color: HColors.outline.withValues(alpha: 0.5),
+                ),
+              ],
+            ),
         ],
       ),
     );

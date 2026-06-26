@@ -57,7 +57,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
             ),
           );
         } else if (state is AuthAuthenticated) {
-          context.go('/');
+          // After registration, go back to login so user signs in manually
+          context.go('/login');
         }
       },
       builder: (context, state) {

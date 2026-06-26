@@ -1,4 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
+
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_bar.dart';
@@ -6,19 +9,22 @@ import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/product_card.dart';
 import '../../core/widgets/sidebar.dart';
 import '../../models/product.dart';
-import '../../data/static_data.dart';
 import '../../services/product_service.dart';
+import '../../services/favorites_service.dart';
+import '../../services/order_service.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_state.dart';
 
 class ShopScreen extends StatefulWidget {
   final List<Product> products;
-  final void Function(Product) onFavoriteToggle;
-  final void Function(Product) onAddToCart;
+  final void Function(Product)? onFavoriteToggle;
+  final void Function(Product)? onAddToCart;
 
   const ShopScreen({
     super.key,
     required this.products,
-    required this.onFavoriteToggle,
-    required this.onAddToCart,
+    this.onFavoriteToggle,
+    this.onAddToCart,
   });
 
   @override
@@ -32,10 +38,80 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
+  List<String> _categories = ['All Crafts'];
+  int _cartCount = 0;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _loadCategories();
+    _loadCartCount();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final productService = context.read<ProductService>();
+      final cats = await productService.getCategories();
+      if (mounted) {
+        setState(() {
+          _categories = ['All Crafts', ...cats.map((c) => c['name']?.toString() ?? '')];
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadCartCount() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        final orderService = context.read<OrderService>();
+        final count = await orderService.getCartCount(authState.user.id);
+        if (mounted) setState(() => _cartCount = count);
+      }
+    } catch (_) {}
+  }
+
+  String? get _currentUserId {
+    final state = context.read<AuthBloc>().state;
+    return state is AuthAuthenticated ? state.user.id : null;
+  }
+
+  Future<void> _handleFavoriteToggle(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    try {
+      final favService = context.read<FavoritesService>();
+      final isNowFavorited = await favService.toggleFavorite(userId, product.id);
+      if (mounted) {
+        setState(() {
+          product.isFavorite = isNowFavorited;
+        });
+        widget.onFavoriteToggle?.call(product);
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleAddToCart(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    try {
+      final orderService = context.read<OrderService>();
+      await orderService.addToCart(userId, product.id);
+      if (mounted) {
+        setState(() {
+          product.cartQty++;
+          _cartCount++;
+        });
+        widget.onAddToCart?.call(product);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.name} added to cart'),
+            duration: const Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (_) {}
   }
 
   @override
@@ -47,8 +123,8 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
 
   List<Product> get _filteredProducts {
     var list = widget.products;
-    if (_selectedCategory != 0) {
-      final cat = StaticData.categories[_selectedCategory];
+    if (_selectedCategory != 0 && _selectedCategory < _categories.length) {
+      final cat = _categories[_selectedCategory];
       list = list.where((p) => p.category == cat).toList();
     }
     if (_searchQuery.isNotEmpty) {
@@ -139,14 +215,14 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         ),
         bottomNavigationBar: HeritageBottomNav(
           currentIndex: _navIndex,
-          cartCount: ProductService.cartCount,
+          cartCount: _cartCount,
           onTap: (i) {
             if (i == _navIndex) return;
-            if (i == 0) Navigator.pushReplacementNamed(context, '/home');
-            if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
-            if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
-            if (i == 3) Navigator.pushReplacementNamed(context, '/cart');
-            if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
+            if (i == 0) context.go('/home');
+            if (i == 1) context.go('/shop');
+            if (i == 2) context.go('/saved');
+            if (i == 3) context.go('/cart');
+            if (i == 4) context.go('/nearby');
           },
         ),
         floatingActionButton: _buildFilterFAB(),
@@ -155,8 +231,6 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildProductsTab() {
-    final categories = ['All Crafts', ...StaticData.categories];
-
     return SingleChildScrollView(
       child: Column(
         children: [
@@ -166,14 +240,14 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
             child: ListView.builder(
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-              itemCount: categories.length,
+              itemCount: _categories.length,
               itemBuilder: (context, index) {
                 final isSelected = _selectedCategory == index;
                 return Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: FilterChip(
                     label: Text(
-                      categories[index],
+                      _categories[index],
                       style: HText.labelLg.copyWith(
                         color: isSelected
                             ? HColors.onSecondary
@@ -224,20 +298,10 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                             isFavorite: product.isFavorite,
                             category: product.category,
                             onFavoriteToggle: () {
-                              setState(() {
-                                widget.onFavoriteToggle(product);
-                              });
+                              _handleFavoriteToggle(product);
                             },
                             onAddToCart: () {
-                              setState(() {
-                                widget.onAddToCart(product);
-                              });
-                              ScaffoldMessenger.of(context).showSnackBar(
-                                SnackBar(
-                                  content: Text('${product.name} added to cart'),
-                                  duration: const Duration(seconds: 2),
-                                ),
-                              );
+                              _handleAddToCart(product);
                             },
                           ),
                         ),
@@ -271,20 +335,10 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                   isFavorite: product.isFavorite,
                   category: product.category,
                   onFavoriteToggle: () {
-                    setState(() {
-                      widget.onFavoriteToggle(product);
-                    });
+                    _handleFavoriteToggle(product);
                   },
                   onAddToCart: () {
-                    setState(() {
-                      widget.onAddToCart(product);
-                    });
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('${product.name} added to cart'),
-                        duration: const Duration(seconds: 2),
-                      ),
-                    );
+                    _handleAddToCart(product);
                   },
                 );
               },
@@ -327,7 +381,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.1),
+            color: Colors.black.withValues(alpha: 0.1),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),
@@ -355,8 +409,8 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
                 colors: [
-                  Colors.black.withOpacity(0.2),
-                  Colors.black.withOpacity(0.8),
+                  Colors.black.withValues(alpha: 0.2),
+                  Colors.black.withValues(alpha: 0.8),
                 ],
               ),
             ),
@@ -377,7 +431,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                 Text(
                   subtitle,
                   style: HText.bodyMd.copyWith(
-                    color: Colors.white.withOpacity(0.8),
+                    color: Colors.white.withValues(alpha: 0.8),
                   ),
                 ),
               ],
@@ -420,7 +474,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withOpacity(0.06),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 20,
             offset: const Offset(0, 4),
           ),

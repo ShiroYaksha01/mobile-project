@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -6,7 +8,11 @@ import '../../core/widgets/app_bar.dart';
 import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/product_card.dart';
 import '../../core/widgets/sidebar.dart';
-import '../../services/product_service.dart';
+import '../../models/product.dart';
+import '../../services/favorites_service.dart';
+import '../../services/order_service.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_state.dart';
 
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
@@ -17,10 +23,80 @@ class FavoritesScreen extends StatefulWidget {
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
   final int _navIndex = 2;
+  List<Product> _favorites = [];
+  bool _isLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadFavorites();
+  }
+
+  String? get _currentUserId {
+    final state = context.read<AuthBloc>().state;
+    return state is AuthAuthenticated ? state.user.id : null;
+  }
+
+  Future<void> _loadFavorites() async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final favService = context.read<FavoritesService>();
+      final items = await favService.getFavoriteProducts(userId);
+      if (mounted) setState(() { _favorites = items; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _handleFavoriteToggle(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    try {
+      final favService = context.read<FavoritesService>();
+      final isNowFavorited = await favService.toggleFavorite(userId, product.id);
+      if (mounted) {
+        setState(() {
+          if (!isNowFavorited) {
+            _favorites.removeWhere((p) => p.id == product.id);
+          } else {
+            product.isFavorite = true;
+          }
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleAddToCart(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    try {
+      final orderService = context.read<OrderService>();
+      await orderService.addToCart(userId, product.id);
+      if (mounted) {
+        setState(() {
+          product.cartQty++;
+        });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.name} added to cart'),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
 
   @override
   Widget build(BuildContext context) {
-    final favorites = ProductService.favorites;
+    if (_isLoading) {
+      return Scaffold(
+        appBar: const HeritageAppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
     return Scaffold(
       appBar: const HeritageAppBar(),
@@ -29,16 +105,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         currentIndex: _navIndex,
         onTap: (i) {
           if (i == _navIndex) return;
-          if (i == 0) Navigator.pushReplacementNamed(context, '/home');
-          if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
+          if (i == 0) context.go('/home');
+          if (i == 1) context.go('/shop');
           if (i == 2) {
             // Already here
           }
-          if (i == 3) Navigator.pushReplacementNamed(context, '/cart');
-          if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
+          if (i == 3) context.go('/cart');
+          if (i == 4) context.go('/nearby');
         },
       ),
-      body: favorites.isEmpty
+      body: _favorites.isEmpty
           ? const _EmptyFavorites()
           : CustomScrollView(
               slivers: [
@@ -54,7 +130,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '${favorites.length} artisan pieces saved',
+                          '${_favorites.length} artisan pieces saved',
                           style: HText.bodyMd.copyWith(
                             color: HColors.onSurfaceVariant,
                           ),
@@ -68,8 +144,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   sliver: SliverGrid(
                     delegate: SliverChildBuilderDelegate(
                       (context, index) {
-                        final product = favorites[index];
-
+                        final product = _favorites[index];
                         return ProductCard(
                           id: product.id,
                           name: product.name,
@@ -80,26 +155,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                           isFavorite: product.isFavorite,
                           category: product.category,
                           onFavoriteToggle: () {
-                            setState(() {
-                              ProductService.toggleFavorite(product.id);
-                            });
+                            _handleFavoriteToggle(product);
                           },
                           onAddToCart: () {
-                            setState(() {
-                              product.cartQty++;
-                            });
-
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text(
-                                  '${product.name} added to cart',
-                                ),
-                              ),
-                            );
+                            _handleAddToCart(product);
                           },
                         );
                       },
-                      childCount: favorites.length,
+                      childCount: _favorites.length,
                     ),
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -158,7 +221,7 @@ class _EmptyFavorites extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () => Navigator.pushNamed(context, '/shop'),
+              onPressed: () => context.go('/shop'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: HColors.primary,
                 foregroundColor: Colors.white,
