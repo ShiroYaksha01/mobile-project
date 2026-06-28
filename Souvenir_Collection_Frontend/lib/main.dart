@@ -17,6 +17,7 @@ import 'services/review_service.dart';
 import 'services/quiz_service.dart';
 import 'services/media_service.dart';
 import 'services/promotion_service.dart';
+import 'services/user_collection_service.dart';
 
 import 'blocs/auth/auth_bloc.dart';
 import 'blocs/auth/auth_event.dart';
@@ -56,6 +57,7 @@ class _SouvenirAppState extends State<SouvenirApp> {
   late final QuizService quizService;
   late final MediaService mediaService;
   late final PromotionService promotionService;
+  late final UserCollectionService userCollectionService;
 
   late final AuthBloc authBloc;
   late final ProductBloc productBloc;
@@ -83,6 +85,7 @@ class _SouvenirAppState extends State<SouvenirApp> {
     quizService = QuizService(apiClient);
     mediaService = MediaService(apiClient);
     promotionService = PromotionService(apiClient);
+    userCollectionService = UserCollectionService(apiClient);
 
     // Initialize blocs
     authBloc = AuthBloc(authService: authService);
@@ -126,6 +129,7 @@ class _SouvenirAppState extends State<SouvenirApp> {
         RepositoryProvider<QuizService>.value(value: quizService),
         RepositoryProvider<MediaService>.value(value: mediaService),
         RepositoryProvider<PromotionService>.value(value: promotionService),
+        RepositoryProvider<UserCollectionService>.value(value: userCollectionService),
       ],
       child: MultiBlocProvider(
         providers: [
