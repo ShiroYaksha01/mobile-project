@@ -23,7 +23,10 @@ public class OrderItem
     [Column(TypeName = "decimal(10,2)")]
     public decimal TotalPrice { get; set; }    
 
+    [NotMapped]
     public OrderItemStatus Status { get; set; } = OrderItemStatus.Pending;
+    
+    [NotMapped]
     public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 }

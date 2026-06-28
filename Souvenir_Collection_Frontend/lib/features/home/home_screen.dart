@@ -45,7 +45,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedCategory = 0;
-  int _navIndex = 0;
+  final int _navIndex = 0;
   bool _showSearch = false;
   final _searchController = TextEditingController();
   String _searchQuery = '';
@@ -57,7 +57,7 @@ class _HomeScreenState extends State<HomeScreen> {
   bool _categoriesLoading = true;
   bool _nearbyLoading = true;
   bool _collectionsLoading = true;
-  int _cartCount = 0;
+
   String _sortBy = 'default'; // 'default', 'price_asc', 'price_desc', 'name'
 
   @override
@@ -131,7 +131,6 @@ class _HomeScreenState extends State<HomeScreen> {
         final count = await orderService.getCartCount(authState.user.id);
         if (mounted) {
           context.read<CartCubit>().setCount(count);
-          setState(() => _cartCount = count);
         }
       }
     } catch (_) {}

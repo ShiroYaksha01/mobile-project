@@ -61,6 +61,13 @@ class AppSidebar extends StatelessWidget {
                   onTap: onProfile ?? () => context.go('/profile'),
                 ),
                 _DrawerItem(
+                  icon: Icons.history_outlined,
+                  selectedIcon: Icons.history,
+                  title: "Order History",
+                  selected: currentIndex == 15,
+                  onTap: () => context.go('/orders'),
+                ),
+                _DrawerItem(
                   icon: Icons.card_giftcard_outlined,
                   selectedIcon: Icons.card_giftcard,
                   title: "Gift Finder",

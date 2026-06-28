@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
-
+import 'package:cached_network_image/cached_network_image.dart';
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_bar.dart';
@@ -13,6 +13,7 @@ import '../../services/order_service.dart';
 import '../../services/promotion_service.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_state.dart';
+import '../../blocs/cart/cart_cubit.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -25,10 +26,7 @@ class _CartScreenState extends State<CartScreen> {
   final int _navIndex = 3;
   List<Product> _cartItems = [];
   bool _isLoading = true;
-  final _promoCtrl = TextEditingController();
-  double? _discount;
-  String? _promoError;
-  String? _appliedCode;
+
 
   @override
   void initState() {
@@ -50,7 +48,11 @@ class _CartScreenState extends State<CartScreen> {
     try {
       final orderService = context.read<OrderService>();
       final items = await orderService.getCartItems(userId);
-      if (mounted) setState(() { _cartItems = items; _isLoading = false; });
+      if (mounted) {
+        setState(() { _cartItems = items; _isLoading = false; });
+        final totalQty = items.fold<int>(0, (sum, item) => sum + item.cartQty);
+        context.read<CartCubit>().setCount(totalQty);
+      }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
@@ -68,6 +70,7 @@ class _CartScreenState extends State<CartScreen> {
           setState(() {
             _cartItems.removeWhere((p) => p.id == product.id);
           });
+          context.read<CartCubit>().decrement();
         }
       } else {
         await orderService.updateQuantity(userId, product.id, newQty);
@@ -75,29 +78,17 @@ class _CartScreenState extends State<CartScreen> {
           setState(() {
             product.cartQty = newQty;
           });
+          if (delta > 0) {
+            context.read<CartCubit>().increment();
+          } else {
+            context.read<CartCubit>().decrement();
+          }
         }
       }
     } catch (_) {}
   }
 
-  Future<void> _validatePromo() async {
-    final code = _promoCtrl.text.trim();
-    if (code.isEmpty) return;
-    setState(() { _promoError = null; _discount = null; });
-    try {
-      final promoService = context.read<PromotionService>();
-      final subTotal = _cartItems.fold<double>(0, (s, i) => s + i.price * i.cartQty);
-      final discount = await promoService.validatePromoCode(code, subTotal: subTotal);
-      if (mounted) {
-        setState(() { _discount = discount; _appliedCode = code; });
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Promo applied! -\$${discount.toStringAsFixed(2)}'), backgroundColor: HColors.success),
-        );
-      }
-    } catch (_) {
-      if (mounted) setState(() => _promoError = 'Invalid or expired code');
-    }
-  }
+
 
   @override
   Widget build(BuildContext context) {
@@ -118,19 +109,21 @@ class _CartScreenState extends State<CartScreen> {
       backgroundColor: HColors.background,
       appBar: const HeritageAppBar(),
       endDrawer: const AppSidebar(currentIndex: -1),
-      bottomNavigationBar: HeritageBottomNav(
-        currentIndex: _navIndex,
-        cartCount: _cartItems.length,
-        onTap: (i) {
-          if (i == _navIndex) return;
-          if (i == 0) context.go('/home');
-          if (i == 1) context.go('/shop');
-          if (i == 2) context.go('/saved');
-          if (i == 3) {
-            // Already here
-          }
-          if (i == 4) context.go('/nearby');
-        },
+      bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
+        builder: (context, cartState) => HeritageBottomNav(
+          currentIndex: _navIndex,
+          cartCount: cartState.cartCount,
+          onTap: (i) {
+            if (i == _navIndex) return;
+            if (i == 0) context.go('/home');
+            if (i == 1) context.go('/shop');
+            if (i == 2) context.go('/saved');
+            if (i == 3) {
+              // Already here
+            }
+            if (i == 4) context.go('/nearby');
+          },
+        ),
       ),
       body: _cartItems.isEmpty
           ? const _EmptyCart()
@@ -151,7 +144,7 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '${_cartItems.length} handcrafted pieces selected',
+                                '${_cartItems.fold<int>(0, (sum, item) => sum + item.cartQty)} handcrafted pieces selected',
                                 style: HText.bodyMd.copyWith(
                                   color: HColors.onSurfaceVariant,
                                 ),
@@ -177,9 +170,7 @@ class _CartScreenState extends State<CartScreen> {
                           ),
                         ),
                       ),
-                      SliverToBoxAdapter(
-                        child: _buildPromoSection(),
-                      ),
+
                       const SliverToBoxAdapter(
                         child: SizedBox(height: 24),
                       ),
@@ -192,66 +183,8 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
-  Widget _buildPromoSection() {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 20),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Text('Promo Code', style: HText.labelLg.copyWith(color: HColors.onSurface)),
-          const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _promoCtrl,
-                  decoration: InputDecoration(
-                    hintText: 'Enter code',
-                    hintStyle: HText.bodyMd.copyWith(color: HColors.outline),
-                    filled: true,
-                    fillColor: HColors.surfaceContainerLowest,
-                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                  ),
-                  style: HText.bodyMd,
-                ),
-              ),
-              const SizedBox(width: 10),
-              GoldButton(text: 'Apply', onPressed: _validatePromo),
-            ],
-          ),
-          if (_promoError != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 6),
-              child: Text(_promoError!, style: HText.labelSm.copyWith(color: HColors.error)),
-            ),
-          if (_appliedCode != null && _discount != null)
-            Padding(
-              padding: const EdgeInsets.only(top: 8),
-              child: Container(
-                padding: const EdgeInsets.all(10),
-                decoration: BoxDecoration(
-                  color: HColors.success.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(Icons.check_circle, color: HColors.success, size: 18),
-                    const SizedBox(width: 8),
-                    Text('$_appliedCode applied: -\$${_discount!.toStringAsFixed(2)}',
-                        style: HText.labelSm.copyWith(color: HColors.success)),
-                  ],
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
-  }
 
   Widget _buildSummary(double total) {
-    final discount = _discount ?? 0;
-    final grandTotal = (total - discount) < 0 ? 0 : total - discount;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       decoration: BoxDecoration(
@@ -273,23 +206,11 @@ class _CartScreenState extends State<CartScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            if (discount > 0)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text('Discount', style: HText.bodyMd.copyWith(color: HColors.success)),
-                    Text('-\$${discount.toStringAsFixed(2)}',
-                        style: HText.bodyMd.copyWith(color: HColors.success, fontWeight: FontWeight.w700)),
-                  ],
-                ),
-              ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Text('Total', style: HText.bodyLg.copyWith(color: HColors.onSurfaceVariant)),
-                Text('\$${grandTotal.toStringAsFixed(2)}',
+                Text('\$${total.toStringAsFixed(2)}',
                     style: HText.headlineMd.copyWith(color: HColors.primary, fontWeight: FontWeight.w700)),
               ],
             ),
@@ -339,6 +260,30 @@ class _CartItemCard extends StatelessWidget {
     required this.onDecrement,
   });
 
+  Widget _buildPlaceholderIcon() {
+    return Container(
+      width: 80,
+      height: 80,
+      decoration: BoxDecoration(
+        color: HColors.surfaceContainerLow,
+        borderRadius: BorderRadius.circular(14),
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            HColors.primary.withValues(alpha: 0.2),
+            HColors.primary.withValues(alpha: 0.05),
+          ],
+        ),
+      ),
+      child: const Icon(
+        Icons.inventory_2_outlined,
+        color: HColors.primary,
+        size: 28,
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -352,27 +297,23 @@ class _CartItemCard extends StatelessWidget {
       child: Row(
         children: [
           // Placeholder for product icon/pattern (matching ProductCard)
-          Container(
-            width: 80,
-            height: 80,
-            decoration: BoxDecoration(
-              color: HColors.surfaceContainerLow,
-              borderRadius: BorderRadius.circular(14),
-              gradient: LinearGradient(
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-                colors: [
-                  HColors.primary.withValues(alpha: 0.2),
-                  HColors.primary.withValues(alpha: 0.05),
-                ],
-              ),
-            ),
-            child: const Icon(
-              Icons.inventory_2_outlined,
-              color: HColors.primary,
-              size: 28,
-            ),
-          ),
+          product.imageUrl.isNotEmpty
+              ? ClipRRect(
+                  borderRadius: BorderRadius.circular(14),
+                  child: CachedNetworkImage(
+                    imageUrl: product.imageUrl,
+                    width: 80,
+                    height: 80,
+                    fit: BoxFit.cover,
+                    placeholder: (context, url) => Container(
+                      width: 80,
+                      height: 80,
+                      color: HColors.surfaceContainerLow,
+                    ),
+                    errorWidget: (context, url, error) => _buildPlaceholderIcon(),
+                  ),
+                )
+              : _buildPlaceholderIcon(),
           const SizedBox(width: 16),
           Expanded(
             child: Column(

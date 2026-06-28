@@ -41,12 +41,12 @@ class ShopScreen extends StatefulWidget {
 class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _selectedCategory = 0;
-  int _navIndex = 1;
+  final int _navIndex = 1;
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
   List<String> _categories = ['All Crafts'];
-  int _cartCount = 0;
+
   String _sortBy = 'default';
   List<UserCollection> _userCollections = [];
 
@@ -107,7 +107,6 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         final count = await orderService.getCartCount(authState.user.id);
         if (mounted) {
           context.read<CartCubit>().setCount(count);
-          setState(() => _cartCount = count);
         }
       }
     } catch (_) {}

@@ -1,4 +1,5 @@
 import '../models/product.dart';
+import '../models/order_history.dart';
 import 'api_client.dart';
 
 class OrderService {
@@ -82,6 +83,57 @@ class OrderService {
       await _apiClient.delete('/cart/user/$userId/clear');
     } catch (e) {
       throw Exception('Failed to clear cart: $e');
+    }
+  }
+
+  // ─── Orders ───────────────────────────────────────────────────
+
+  /// Get order history for a user
+  Future<List<OrderHistory>> getOrderHistory(String userId) async {
+    try {
+      final response = await _apiClient.get('/orders/user/$userId');
+      if (response.statusCode == 200) {
+        final List<dynamic> data = response.data['data'] ?? [];
+        return data.map((json) {
+          return OrderHistory.fromJson({
+            'id': json['id'],
+            'date': json['createdAt'] != null ? DateTime.parse(json['createdAt']).toLocal().toString().split(' ')[0] : '',
+            'total': json['grandTotal'],
+            'status': json['status'],
+            'items': json['orderItems'] != null ? (json['orderItems'] as List).length : 0,
+          });
+        }).toList();
+      }
+      return [];
+    } catch (e) {
+      throw Exception('Failed to load order history: $e');
+    }
+  }
+
+  /// Create an order from the cart
+  Future<void> createOrder(String userId, {
+    String paymentMethod = "CreditCard",
+    String deliveryAddress = "123 Main St",
+    String deliveryMessage = "",
+    String? promotionId,
+  }) async {
+    try {
+      final response = await _apiClient.post(
+        '/orders/user/$userId',
+        data: {
+          'paymentMethod': paymentMethod,
+          'deliveryAddress': deliveryAddress,
+          'deliveryMessage': deliveryMessage,
+          'deliveryDate': DateTime.now().toUtc().add(const Duration(days: 3)).toIso8601String(),
+          if (promotionId != null) 'promotionId': promotionId,
+        },
+      );
+      // Depending on backend, might be 200 or 201
+      if (response.statusCode != 200 && response.statusCode != 201) {
+        throw Exception('Failed to place order');
+      }
+    } catch (e) {
+      throw Exception('Failed to place order: $e');
     }
   }
 }
