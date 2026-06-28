@@ -57,7 +57,9 @@ class ProductCard extends StatelessWidget {
     final meta = _metaFor(category, id.hashCode);
     final hasImage = imageUrl.isNotEmpty;
 
-    return Container(
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
       decoration: BoxDecoration(
         color: HColors.surfaceContainerLowest,
         borderRadius: BorderRadius.circular(16),
@@ -195,6 +197,7 @@ class ProductCard extends StatelessWidget {
           ),
         ],
       ),
+    ),
     );
   }
 
