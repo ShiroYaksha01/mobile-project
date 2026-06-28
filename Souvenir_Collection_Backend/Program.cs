@@ -164,6 +164,7 @@ builder.Services.AddScoped<ChatService>();
 builder.Services.AddScoped<FavoriteService>();
 builder.Services.AddScoped<CartService>();
 builder.Services.AddScoped<QuizService>();
+builder.Services.AddScoped<Souvenir_Collection_Backend.Services.UserCollectionService>();
 
 var app = builder.Build();
 
@@ -180,7 +181,21 @@ using (var scope = app.Services.CreateScope())
         await context.Database.ExecuteSqlRawAsync("ALTER TABLE products ADD COLUMN IF NOT EXISTS collection_id uuid REFERENCES collections(id);");
         await context.Database.ExecuteSqlRawAsync("ALTER TABLE products DROP COLUMN IF EXISTS collection_display_order CASCADE;");
         await context.Database.ExecuteSqlRawAsync("ALTER TABLE collections DROP COLUMN IF EXISTS display_order CASCADE;");
-        Console.WriteLine("Database schema altered successfully (user_id and collection_id verified, constraints and display_orders adjusted).");
+        await context.Database.ExecuteSqlRawAsync(@"
+            CREATE TABLE IF NOT EXISTS user_collections (
+                id uuid PRIMARY KEY,
+                user_id uuid REFERENCES users(id),
+                name character varying(150) NOT NULL,
+                created_at timestamp with time zone NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS user_collection_items (
+                id uuid PRIMARY KEY,
+                user_collection_id uuid REFERENCES user_collections(id) ON DELETE CASCADE,
+                product_id uuid REFERENCES products(id),
+                quantity integer NOT NULL DEFAULT 1
+            );
+        ");
+        Console.WriteLine("Database schema altered successfully (user_id and collection_id verified, constraints and display_orders adjusted, user collections created).");
 
         using (var command = context.Database.GetDbConnection().CreateCommand())
         {
