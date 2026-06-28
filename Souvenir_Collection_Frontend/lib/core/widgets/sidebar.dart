@@ -1,5 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_event.dart';
 import '../theme/app_colors.dart';
 import '../theme/app_text_styles.dart';
 import 'phka_chan_painter.dart';
@@ -10,6 +14,11 @@ class AppSidebar extends StatelessWidget {
   final VoidCallback? onAbout;
   final VoidCallback? onHelp;
   final VoidCallback? onLogout;
+  final VoidCallback? onExplore;
+  final VoidCallback? onMap;
+  final VoidCallback? onQuiz;
+  final VoidCallback? onPromotions;
+  final VoidCallback? onMedia;
   final int currentIndex;
 
   const AppSidebar({
@@ -19,6 +28,11 @@ class AppSidebar extends StatelessWidget {
     this.onAbout,
     this.onHelp,
     this.onLogout,
+    this.onExplore,
+    this.onMap,
+    this.onQuiz,
+    this.onPromotions,
+    this.onMedia,
     this.currentIndex = -1,
   });
 
@@ -44,28 +58,35 @@ class AppSidebar extends StatelessWidget {
                   selectedIcon: Icons.person,
                   title: "Profile",
                   selected: currentIndex == 5,
-                  onTap: onProfile ?? () {},
+                  onTap: onProfile ?? () => context.go('/profile'),
+                ),
+                _DrawerItem(
+                  icon: Icons.card_giftcard_outlined,
+                  selectedIcon: Icons.card_giftcard,
+                  title: "Gift Finder",
+                  selected: currentIndex == 12,
+                  onTap: onQuiz ?? () => context.go('/quiz'),
                 ),
                 _DrawerItem(
                   icon: Icons.settings_outlined,
                   selectedIcon: Icons.settings,
                   title: "Settings",
                   selected: currentIndex == 6,
-                  onTap: onSettings ?? () {},
+                  onTap: onSettings ?? () => context.go('/settings'),
                 ),
                 _DrawerItem(
                   icon: Icons.info_outline,
                   selectedIcon: Icons.info,
                   title: "About Heritage",
                   selected: currentIndex == 7,
-                  onTap: onAbout ?? () {},
+                  onTap: onAbout ?? () => context.go('/about'),
                 ),
                 _DrawerItem(
                   icon: Icons.help_outline,
                   selectedIcon: Icons.help,
                   title: "Help & Support",
                   selected: currentIndex == 8,
-                  onTap: onHelp ?? () {},
+                  onTap: onHelp ?? () => context.go('/help'),
                 ),
               ],
             ),
@@ -166,7 +187,10 @@ class AppSidebar extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(20),
         child: InkWell(
-          onTap: onLogout ?? () => Navigator.pushReplacementNamed(context, '/login'),
+          onTap: onLogout ?? () {
+            context.read<AuthBloc>().add(AuthLogoutRequested());
+            context.go('/login');
+          },
           borderRadius: BorderRadius.circular(16),
           child: Container(
             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),

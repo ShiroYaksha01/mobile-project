@@ -1,11 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_bar.dart';
 import '../../core/widgets/bottom_nav.dart';
+import '../../core/widgets/gold_button.dart';
 import '../../core/widgets/sidebar.dart';
-import '../../data/static_data.dart';
+import '../../models/product.dart';
+import '../../services/order_service.dart';
+import '../../services/promotion_service.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_state.dart';
 
 class CartScreen extends StatefulWidget {
   const CartScreen({super.key});
@@ -16,13 +23,93 @@ class CartScreen extends StatefulWidget {
 
 class _CartScreenState extends State<CartScreen> {
   final int _navIndex = 3;
+  List<Product> _cartItems = [];
+  bool _isLoading = true;
+  final _promoCtrl = TextEditingController();
+  double? _discount;
+  String? _promoError;
+  String? _appliedCode;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCart();
+  }
+
+  String? get _currentUserId {
+    final state = context.read<AuthBloc>().state;
+    return state is AuthAuthenticated ? state.user.id : null;
+  }
+
+  Future<void> _loadCart() async {
+    final userId = _currentUserId;
+    if (userId == null) {
+      if (mounted) setState(() => _isLoading = false);
+      return;
+    }
+    try {
+      final orderService = context.read<OrderService>();
+      final items = await orderService.getCartItems(userId);
+      if (mounted) setState(() { _cartItems = items; _isLoading = false; });
+    } catch (_) {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _updateQuantity(Product product, int delta) async {
+    final userId = _currentUserId;
+    if (userId == null) return;
+    final newQty = product.cartQty + delta;
+    try {
+      final orderService = context.read<OrderService>();
+      if (newQty <= 0) {
+        await orderService.removeItem(userId, product.id);
+        if (mounted) {
+          setState(() {
+            _cartItems.removeWhere((p) => p.id == product.id);
+          });
+        }
+      } else {
+        await orderService.updateQuantity(userId, product.id, newQty);
+        if (mounted) {
+          setState(() {
+            product.cartQty = newQty;
+          });
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _validatePromo() async {
+    final code = _promoCtrl.text.trim();
+    if (code.isEmpty) return;
+    setState(() { _promoError = null; _discount = null; });
+    try {
+      final promoService = context.read<PromotionService>();
+      final subTotal = _cartItems.fold<double>(0, (s, i) => s + i.price * i.cartQty);
+      final discount = await promoService.validatePromoCode(code, subTotal: subTotal);
+      if (mounted) {
+        setState(() { _discount = discount; _appliedCode = code; });
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Promo applied! -\$${discount.toStringAsFixed(2)}'), backgroundColor: HColors.success),
+        );
+      }
+    } catch (_) {
+      if (mounted) setState(() => _promoError = 'Invalid or expired code');
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
-    final cartItems =
-        StaticData.products.where((p) => p.cartQty > 0).toList();
+    if (_isLoading) {
+      return Scaffold(
+        backgroundColor: HColors.background,
+        appBar: const HeritageAppBar(),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
 
-    final total = cartItems.fold<double>(
+    final total = _cartItems.fold<double>(
       0,
       (sum, item) => sum + item.price * item.cartQty,
     );
@@ -33,19 +120,19 @@ class _CartScreenState extends State<CartScreen> {
       endDrawer: const AppSidebar(currentIndex: -1),
       bottomNavigationBar: HeritageBottomNav(
         currentIndex: _navIndex,
-        cartCount: cartItems.length,
+        cartCount: _cartItems.length,
         onTap: (i) {
           if (i == _navIndex) return;
-          if (i == 0) Navigator.pushReplacementNamed(context, '/home');
-          if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
-          if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
+          if (i == 0) context.go('/home');
+          if (i == 1) context.go('/shop');
+          if (i == 2) context.go('/saved');
           if (i == 3) {
             // Already here
           }
-          if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
+          if (i == 4) context.go('/nearby');
         },
       ),
-      body: cartItems.isEmpty
+      body: _cartItems.isEmpty
           ? const _EmptyCart()
           : Column(
               children: [
@@ -64,7 +151,7 @@ class _CartScreenState extends State<CartScreen> {
                               ),
                               const SizedBox(height: 6),
                               Text(
-                                '${cartItems.length} handcrafted pieces selected',
+                                '${_cartItems.length} handcrafted pieces selected',
                                 style: HText.bodyMd.copyWith(
                                   color: HColors.onSurfaceVariant,
                                 ),
@@ -78,19 +165,23 @@ class _CartScreenState extends State<CartScreen> {
                         sliver: SliverList(
                           delegate: SliverChildBuilderDelegate(
                             (context, index) {
-                              final product = cartItems[index];
-
+                              final product = _cartItems[index];
                               return _CartItemCard(
                                 product: product,
                                 onUpdate: () => setState(() {}),
+                                onIncrement: () => _updateQuantity(product, 1),
+                                onDecrement: () => _updateQuantity(product, -1),
                               );
                             },
-                            childCount: cartItems.length,
+                            childCount: _cartItems.length,
                           ),
                         ),
                       ),
+                      SliverToBoxAdapter(
+                        child: _buildPromoSection(),
+                      ),
                       const SliverToBoxAdapter(
-                        child: SizedBox(height: 32),
+                        child: SizedBox(height: 24),
                       ),
                     ],
                   ),
@@ -101,7 +192,66 @@ class _CartScreenState extends State<CartScreen> {
     );
   }
 
+  Widget _buildPromoSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 20),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('Promo Code', style: HText.labelLg.copyWith(color: HColors.onSurface)),
+          const SizedBox(height: 8),
+          Row(
+            children: [
+              Expanded(
+                child: TextField(
+                  controller: _promoCtrl,
+                  decoration: InputDecoration(
+                    hintText: 'Enter code',
+                    hintStyle: HText.bodyMd.copyWith(color: HColors.outline),
+                    filled: true,
+                    fillColor: HColors.surfaceContainerLowest,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  ),
+                  style: HText.bodyMd,
+                ),
+              ),
+              const SizedBox(width: 10),
+              GoldButton(text: 'Apply', onPressed: _validatePromo),
+            ],
+          ),
+          if (_promoError != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: Text(_promoError!, style: HText.labelSm.copyWith(color: HColors.error)),
+            ),
+          if (_appliedCode != null && _discount != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 8),
+              child: Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: HColors.success.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.check_circle, color: HColors.success, size: 18),
+                    const SizedBox(width: 8),
+                    Text('$_appliedCode applied: -\$${_discount!.toStringAsFixed(2)}',
+                        style: HText.labelSm.copyWith(color: HColors.success)),
+                  ],
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildSummary(double total) {
+    final discount = _discount ?? 0;
+    final grandTotal = (total - discount) < 0 ? 0 : total - discount;
     return Container(
       padding: const EdgeInsets.fromLTRB(20, 24, 20, 32),
       decoration: BoxDecoration(
@@ -123,22 +273,24 @@ class _CartScreenState extends State<CartScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            if (discount > 0)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Text('Discount', style: HText.bodyMd.copyWith(color: HColors.success)),
+                    Text('-\$${discount.toStringAsFixed(2)}',
+                        style: HText.bodyMd.copyWith(color: HColors.success, fontWeight: FontWeight.w700)),
+                  ],
+                ),
+              ),
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  'Total Amount',
-                  style: HText.bodyLg.copyWith(
-                    color: HColors.onSurfaceVariant,
-                  ),
-                ),
-                Text(
-                  '\$${total.toStringAsFixed(0)}',
-                  style: HText.headlineMd.copyWith(
-                    color: HColors.primary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                Text('Total', style: HText.bodyLg.copyWith(color: HColors.onSurfaceVariant)),
+                Text('\$${grandTotal.toStringAsFixed(2)}',
+                    style: HText.headlineMd.copyWith(color: HColors.primary, fontWeight: FontWeight.w700)),
               ],
             ),
             const SizedBox(height: 24),
@@ -147,7 +299,9 @@ class _CartScreenState extends State<CartScreen> {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  // TODO: Proceed to checkout
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('Proceeding to payment...')),
+                  );
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: HColors.primary,
@@ -174,12 +328,16 @@ class _CartScreenState extends State<CartScreen> {
 }
 
 class _CartItemCard extends StatelessWidget {
-  final dynamic product;
+  final Product product;
   final VoidCallback onUpdate;
+  final VoidCallback onIncrement;
+  final VoidCallback onDecrement;
 
   const _CartItemCard({
     required this.product,
     required this.onUpdate,
+    required this.onIncrement,
+    required this.onDecrement,
   });
 
   @override
@@ -250,7 +408,7 @@ class _CartItemCard extends StatelessWidget {
             children: [
               GestureDetector(
                 onTap: () {
-                  product.cartQty++;
+                  onIncrement();
                   onUpdate();
                 },
                 child: Container(
@@ -274,7 +432,7 @@ class _CartItemCard extends StatelessWidget {
               GestureDetector(
                 onTap: () {
                   if (product.cartQty > 0) {
-                    product.cartQty--;
+                    onDecrement();
                     onUpdate();
                   }
                 },
@@ -334,7 +492,7 @@ class _EmptyCart extends StatelessWidget {
             ),
             const SizedBox(height: 32),
             ElevatedButton(
-              onPressed: () => Navigator.pushReplacementNamed(context, '/shop'),
+              onPressed: () => context.go('/shop'),
               style: ElevatedButton.styleFrom(
                 backgroundColor: HColors.primary,
                 foregroundColor: Colors.white,

@@ -2,6 +2,7 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
@@ -10,24 +11,32 @@ import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/category_chip.dart';
 import '../../core/widgets/product_card.dart';
 import '../../core/widgets/sidebar.dart';
-import '../../data/static_data.dart';
 import '../../models/artisan.dart';
+import '../../models/collection.dart';
 import '../../models/nearby_shop.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
+import '../../services/favorites_service.dart';
+import '../../services/order_service.dart';
+import '../../services/map_service.dart';
+import '../../services/collection_service.dart';
 import '../../blocs/artisans/artisan_bloc.dart';
 import '../../blocs/artisans/artisan_state.dart';
+import '../../blocs/auth/auth_bloc.dart';
+import '../../blocs/auth/auth_state.dart';
+import '../../blocs/cart/cart_cubit.dart';
+import '../../blocs/favorites/favorites_cubit.dart';
 
 class HomeScreen extends StatefulWidget {
   final List<Product> products;
-  final void Function(Product) onFavoriteToggle;
-  final void Function(Product) onAddToCart;
+  final void Function(Product)? onFavoriteToggle;
+  final void Function(Product)? onAddToCart;
 
   const HomeScreen({
     super.key,
     required this.products,
-    required this.onFavoriteToggle,
-    required this.onAddToCart,
+    this.onFavoriteToggle,
+    this.onAddToCart,
   });
 
   @override
@@ -41,10 +50,180 @@ class _HomeScreenState extends State<HomeScreen> {
   final _searchController = TextEditingController();
   String _searchQuery = '';
 
+  // Data from API
+  List<String> _categories = ['All'];
+  List<NearbyShop> _nearbyShops = [];
+  List<Collection> _collections = [];
+  bool _categoriesLoading = true;
+  bool _nearbyLoading = true;
+  bool _collectionsLoading = true;
+  int _cartCount = 0;
+  String _sortBy = 'default'; // 'default', 'price_asc', 'price_desc', 'name'
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCategories();
+    _loadNearbyShops();
+    _loadCollections();
+    _loadCartCount();
+    _loadFavorites();
+  }
+
+  Future<void> _loadCategories() async {
+    try {
+      final productService = context.read<ProductService>();
+      final cats = await productService.getCategories();
+      if (mounted) {
+        setState(() {
+          // Deduplicate categories
+          final names = cats.map((c) => c['name']?.toString() ?? '').where((n) => n.isNotEmpty).toSet().toList();
+          _categories = ['All', ...names];
+          _categoriesLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _categoriesLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadNearbyShops() async {
+    try {
+      final mapService = context.read<MapService>();
+      final shops = await mapService.getBranches();
+      if (mounted) {
+        setState(() {
+          _nearbyShops = shops;
+          _nearbyLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _nearbyLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadCollections() async {
+    try {
+      final collectionService = context.read<CollectionService>();
+      final collections = await collectionService.getCollections();
+      if (mounted) {
+        setState(() {
+          _collections = collections;
+          _collectionsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _collectionsLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadCartCount() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        final orderService = context.read<OrderService>();
+        final count = await orderService.getCartCount(authState.user.id);
+        if (mounted) {
+          context.read<CartCubit>().setCount(count);
+          setState(() => _cartCount = count);
+        }
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _loadFavorites() async {
+    try {
+      final authState = context.read<AuthBloc>().state;
+      if (authState is AuthAuthenticated) {
+        final favService = context.read<FavoritesService>();
+        final items = await favService.getFavoriteProducts(authState.user.id);
+        if (mounted) {
+          final ids = items.map((p) => p.id).toSet();
+          context.read<FavoritesCubit>().setFavorites(ids);
+        }
+      }
+    } catch (_) {}
+  }
+
+  String? get _currentUserId {
+    final state = context.read<AuthBloc>().state;
+    return state is AuthAuthenticated ? state.user.id : null;
+  }
+
+  Future<void> _handleFavoriteToggle(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null || userId.isEmpty) {
+      _showLoginPrompt();
+      return;
+    }
+    try {
+      final favService = context.read<FavoritesService>();
+      final isNowFavorited = await favService.toggleFavorite(userId, product.id);
+      if (mounted) {
+        context.read<FavoritesCubit>().toggle(product.id);
+        setState(() => product.isFavorite = isNowFavorited);
+        widget.onFavoriteToggle?.call(product);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(isNowFavorited ? 'Added to favorites' : 'Removed from favorites'),
+            duration: const Duration(seconds: 1),
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _handleAddToCart(Product product) async {
+    final userId = _currentUserId;
+    if (userId == null || userId.isEmpty) {
+      _showLoginPrompt();
+      return;
+    }
+    try {
+      final orderService = context.read<OrderService>();
+      await orderService.addToCart(userId, product.id);
+      if (mounted) {
+        context.read<CartCubit>().increment();
+        setState(() => product.cartQty++);
+        widget.onAddToCart?.call(product);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${product.name} added to cart'),
+            duration: const Duration(seconds: 2),
+            backgroundColor: HColors.success,
+          ),
+        );
+      }
+    } catch (_) {}
+  }
+
+  void _showLoginPrompt() {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Sign in required'),
+        content: const Text('Please sign in to add items to cart or favorites.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('Cancel')),
+          ElevatedButton(
+            onPressed: () { Navigator.pop(ctx); context.go('/login'); },
+            child: const Text('Sign In'),
+          ),
+        ],
+      ),
+    );
+  }
+
   List<Product> get _filteredProducts {
-    var list = widget.products;
-    if (_selectedCategory != 0) {
-      final cat = StaticData.categories[_selectedCategory];
+    var list = widget.products.toList();
+    if (_selectedCategory != 0 && _selectedCategory < _categories.length) {
+      final cat = _categories[_selectedCategory];
       list = list.where((p) => p.category == cat).toList();
     }
     if (_searchQuery.isNotEmpty) {
@@ -54,6 +233,12 @@ class _HomeScreenState extends State<HomeScreen> {
               p.subtitle.toLowerCase().contains(_searchQuery.toLowerCase()) ||
               p.category.toLowerCase().contains(_searchQuery.toLowerCase()))
           .toList();
+    }
+    // Sort
+    switch (_sortBy) {
+      case 'price_asc': list.sort((a, b) => a.price.compareTo(b.price)); break;
+      case 'price_desc': list.sort((a, b) => b.price.compareTo(a.price)); break;
+      case 'name': list.sort((a, b) => a.name.compareTo(b.name)); break;
     }
     return list;
   }
@@ -70,7 +255,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final showFiltered = _selectedCategory != 0 || _searchQuery.isNotEmpty;
     final displayProducts = showFiltered ? _filteredProducts : featured;
 
-    return Scaffold(
+    return BlocListener<AuthBloc, AuthState>(
+      listener: (context, authState) {
+        if (authState is AuthAuthenticated) {
+          _loadFavorites();
+          _loadCartCount();
+        }
+      },
+      child: Scaffold(
       appBar: HeritageAppBar(
         onSearch: () {
           setState(() {
@@ -83,17 +275,19 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       ),
       endDrawer: const AppSidebar(currentIndex: -1),
-      bottomNavigationBar: HeritageBottomNav(
+      bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
+        builder: (context, cartState) => HeritageBottomNav(
         currentIndex: _navIndex,
-        cartCount: ProductService.cartCount,
+        cartCount: cartState.cartCount,
         onTap: (i) {
           if (i == _navIndex) return;
-          if (i == 0) Navigator.pushReplacementNamed(context, '/home');
-          if (i == 1) Navigator.pushReplacementNamed(context, '/shop');
-          if (i == 2) Navigator.pushReplacementNamed(context, '/saved');
-          if (i == 3) Navigator.pushReplacementNamed(context, '/cart');
-          if (i == 4) Navigator.pushReplacementNamed(context, '/nearby');
+          if (i == 0) context.go('/home');
+          if (i == 1) context.go('/shop');
+          if (i == 2) context.go('/saved');
+          if (i == 3) context.go('/cart');
+          if (i == 4) context.go('/nearby');
         },
+      ),
       ),
       body: CustomScrollView(
         slivers: [
@@ -113,6 +307,8 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(child: const SizedBox(height: 14)),
           SliverToBoxAdapter(child: _buildProductRow(displayProducts)),
           const SliverToBoxAdapter(child: SizedBox(height: 36)),
+          SliverToBoxAdapter(child: _buildCollectionsSection()),
+          const SliverToBoxAdapter(child: SizedBox(height: 36)),
           SliverToBoxAdapter(child: _buildArtisanSection()),
           const SliverToBoxAdapter(child: SizedBox(height: 36)),
           SliverToBoxAdapter(child: _buildStoryCard()),
@@ -123,7 +319,8 @@ class _HomeScreenState extends State<HomeScreen> {
           const SliverToBoxAdapter(child: SizedBox(height: 32)),
         ],
       ),
-    );
+    ),
+    ); // BlocListener
   }
 
   Widget _buildSearchBar() {
@@ -163,15 +360,21 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildCategoryRow() {
+    if (_categoriesLoading && _categories.length <= 1) {
+      return const SizedBox(
+        height: 42,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
     return SizedBox(
       height: 42,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: StaticData.categories.length,
+        itemCount: _categories.length,
         separatorBuilder: (_, _) => const SizedBox(width: 8),
         itemBuilder: (ctx, i) => CategoryChip(
-          label: StaticData.categories[i],
+          label: _categories[i],
           selected: i == _selectedCategory,
           onTap: () => setState(() => _selectedCategory = i),
         ),
@@ -223,11 +426,26 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.end,
         children: [
-          Text(title,
-              style: HText.headlineMd.copyWith(color: HColors.primary)),
-          if (subtitle != null)
-            Text(subtitle,
-                style: HText.labelSm.copyWith(color: HColors.outline)),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(title, style: HText.headlineMd.copyWith(color: HColors.primary)),
+              if (subtitle != null)
+                Text(subtitle, style: HText.labelSm.copyWith(color: HColors.outline)),
+            ],
+          ),
+          PopupMenuButton<String>(
+            initialValue: _sortBy,
+            onSelected: (v) => setState(() => _sortBy = v),
+            itemBuilder: (_) => [
+              const PopupMenuItem(value: 'default', child: Text('Default')),
+              const PopupMenuItem(value: 'price_asc', child: Text('Price: Low→High')),
+              const PopupMenuItem(value: 'price_desc', child: Text('Price: High→Low')),
+              const PopupMenuItem(value: 'name', child: Text('Name A→Z')),
+            ],
+            child: const Icon(Icons.sort, color: HColors.primary),
+          ),
         ],
       ),
     );
@@ -240,56 +458,106 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Center(
           child: Column(
             children: [
-              const Icon(Icons.inventory_2_outlined,
-                  size: 48, color: HColors.outline),
+              const Icon(Icons.inventory_2_outlined, size: 48, color: HColors.outline),
               const SizedBox(height: 12),
-              Text('No items found',
-                  style: HText.bodyMd.copyWith(color: HColors.outline)),
+              Text('No items found', style: HText.bodyMd.copyWith(color: HColors.outline)),
             ],
           ),
         ),
       );
     }
-    return SizedBox(
-      height: 310,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: products.length,
-        separatorBuilder: (_, _) => const SizedBox(width: 16),
-        itemBuilder: (ctx, i) {
-          final p = products[i];
-          return SizedBox(
-            width: 200,
-            child: ProductCard(
-              id: p.id,
-              name: p.name,
-              subtitle: p.subtitle,
-              imageUrl: '', // unused — image-free design
-              price: p.price,
-              badge: p.badge,
-              isFavorite: p.isFavorite,
-              category: p.category,
-              onFavoriteToggle: () {
-                setState(() {
-                  widget.onFavoriteToggle(p);
-                });
-              },
-              onAddToCart: () {
-                setState(() {
-                  widget.onAddToCart(p);
-                });
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('${p.name} added to cart'),
-                    duration: const Duration(seconds: 2),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
+    return BlocBuilder<FavoritesCubit, FavoritesState>(
+      builder: (context, favState) {
+        return SizedBox(
+          height: 320,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: products.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 16),
+            itemBuilder: (ctx, i) {
+              final p = products[i];
+              final isFav = favState.favoriteIds.contains(p.id);
+              return SizedBox(
+                width: 200,
+                child: ProductCard(
+                  id: p.id, name: p.name, subtitle: p.subtitle,
+                  imageUrl: p.imageUrl, price: p.price,
+                  badge: p.badge, isFavorite: isFav, category: p.category,
+                  onFavoriteToggle: () => _handleFavoriteToggle(p),
+                  onAddToCart: () => _handleAddToCart(p),
+                  onTap: () => context.push('/product/${p.id}'),
+                ),
+              );
+            },
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildCollectionsSection() {
+    if (_collectionsLoading && _collections.isEmpty) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (_collections.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Curated Collections',
+                      style: HText.headlineMd.copyWith(color: HColors.primary)),
+                  const SizedBox(height: 2),
+                  Text('Discover Cambodian heritage',
+                      style: HText.labelSm.copyWith(color: HColors.outline)),
+                ],
+              ),
+              GestureDetector(
+                onTap: () => context.push('/explore'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('View All',
+                        style: HText.labelSm.copyWith(
+                            color: HColors.primary,
+                            fontWeight: FontWeight.w600)),
+                    const Icon(Icons.arrow_forward_ios,
+                        size: 12, color: HColors.primary),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 240,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _collections.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (ctx, i) {
+              final c = _collections[i];
+              return _CollectionCard(collection: c);
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -390,15 +658,30 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildNearbyShops() {
+    if (_nearbyLoading && _nearbyShops.isEmpty) {
+      return const SizedBox(
+        height: 170,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (_nearbyShops.isEmpty) {
+      return const SizedBox(
+        height: 170,
+        child: Center(
+          child: Text('No nearby shops found',
+              style: TextStyle(color: HColors.outline)),
+        ),
+      );
+    }
     return SizedBox(
       height: 170,
       child: ListView.separated(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 20),
-        itemCount: StaticData.nearbyShops.length,
+        itemCount: _nearbyShops.length,
         separatorBuilder: (_, _) => const SizedBox(width: 14),
         itemBuilder: (ctx, i) =>
-            _NearbyShopCard(shop: StaticData.nearbyShops[i]),
+            _NearbyShopCard(shop: _nearbyShops[i]),
       ),
     );
   }
@@ -508,7 +791,7 @@ class _HeroSection extends StatelessWidget {
                   const SizedBox(height: 18),
                   ElevatedButton(
                     onPressed: () {
-                      Navigator.pushNamed(context, '/shop');
+                      context.go('/shop');
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: HColors.primaryContainer,
@@ -644,6 +927,116 @@ class _ArtisanAvatar extends StatelessWidget {
   }
 }
 
+// ─── collection card ────────────────────────────────────────────────
+class _CollectionCard extends StatelessWidget {
+  final Collection collection;
+  const _CollectionCard({required this.collection});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/collection/${collection.id}'),
+      child: Container(
+        width: 180,
+        decoration: BoxDecoration(
+          color: HColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E2E2E).withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 3,
+              child: collection.image.isNotEmpty
+                  ? Image.network(collection.image, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  HColors.primary.withValues(alpha: 0.6),
+                                  HColors.primary.withValues(alpha: 0.25),
+                                ],
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.museum_outlined,
+                                  size: 36, color: Colors.white70),
+                            ),
+                          ))
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            HColors.primary.withValues(alpha: 0.6),
+                            HColors.primary.withValues(alpha: 0.25),
+                          ],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.museum_outlined,
+                            size: 36, color: Colors.white70),
+                      ),
+                    ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      collection.title,
+                      style: HText.labelLg.copyWith(color: HColors.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      collection.description,
+                      style: HText.labelSm.copyWith(color: HColors.outline),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    if (collection.type.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: HColors.primaryContainer
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          collection.type,
+                          style: HText.labelSm.copyWith(
+                              color: HColors.primary, fontSize: 10),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 // ─── nearby shop card ───────────────────────────────────────────────
 class _NearbyShopCard extends StatelessWidget {
   final NearbyShop shop;
@@ -683,26 +1076,27 @@ class _NearbyShopCard extends StatelessWidget {
                     const Icon(Icons.store, color: HColors.primary, size: 20),
               ),
               const Spacer(),
-              Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(
-                  color: HColors.primaryContainer.withValues(alpha: 0.15),
-                  borderRadius: BorderRadius.circular(999),
+              if (shop.rating > 0)
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: HColors.primaryContainer.withValues(alpha: 0.15),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(Icons.star, size: 12, color: HColors.primary),
+                      const SizedBox(width: 3),
+                      Text(shop.rating.toString(),
+                          style: HText.labelSm.copyWith(
+                              color: HColors.primary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 11)),
+                    ],
+                  ),
                 ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Icon(Icons.star, size: 12, color: HColors.primary),
-                    const SizedBox(width: 3),
-                    Text(shop.rating.toString(),
-                        style: HText.labelSm.copyWith(
-                            color: HColors.primary,
-                            fontWeight: FontWeight.w700,
-                            fontSize: 11)),
-                  ],
-                ),
-              ),
             ],
           ),
           const SizedBox(height: 12),
@@ -714,16 +1108,17 @@ class _NearbyShopCard extends StatelessWidget {
           Text(shop.type,
               style: HText.labelSm.copyWith(color: HColors.outline)),
           const Spacer(),
-          Row(
-            children: [
-              const Icon(Icons.location_on_outlined,
-                  size: 13, color: HColors.secondary),
-              const SizedBox(width: 4),
-              Text(shop.distance,
-                  style: HText.labelSm.copyWith(
-                      color: HColors.secondary, fontSize: 10)),
-            ],
-          ),
+          if (shop.distance.isNotEmpty)
+            Row(
+              children: [
+                const Icon(Icons.location_on_outlined,
+                    size: 13, color: HColors.secondary),
+                const SizedBox(width: 4),
+                Text(shop.distance,
+                    style: HText.labelSm.copyWith(
+                        color: HColors.secondary, fontSize: 10)),
+              ],
+            ),
         ],
       ),
     );

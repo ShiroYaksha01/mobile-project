@@ -2,6 +2,7 @@ namespace Sovenire_Collenction_Backend.DTOs.Auth
 {
     public class LoginResponse
     {
+        public Guid Id { get; set; }
         public string AccessToken { get; set; } = string.Empty;
         public string RefreshToken { get; set; } = string.Empty;
         public string Name { get; set; } = string.Empty;

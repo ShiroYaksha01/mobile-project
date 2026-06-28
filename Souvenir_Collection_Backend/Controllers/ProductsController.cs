@@ -20,6 +20,7 @@ namespace Sovenire_Collenction_Backend.Controllers
             Id = p.Id,
             ArtisanId = p.ArtisanId,
             CategoryId = p.CategoryId,
+            CategoryName = p.Category?.Name ?? string.Empty,
             CollectionId = p.CollectionId,
             Name = p.Name,
             Description = p.Description,

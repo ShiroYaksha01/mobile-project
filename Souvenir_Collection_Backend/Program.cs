@@ -30,6 +30,18 @@ builder.Services.AddSingleton(provider =>
 
         client.InitializeAsync().Wait();
     Console.WriteLine("Connected to Supabase!");
+
+    // Ensure "media" storage bucket exists
+    try
+    {
+        client.Storage.CreateBucket("media", new Supabase.Storage.BucketUpsertOptions { Public = true });
+        Console.WriteLine("Storage bucket 'media' created successfully.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Note: Could not create 'media' bucket (may already exist): {ex.Message}");
+    }
+
     return client;
 
     }catch(Exception ex){
@@ -82,7 +94,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
         npgsqlOptions.MapEnum<DiscountType>("discount_type", nameTranslator: translator);
         npgsqlOptions.MapEnum<PromotionStatus>("promotion_status", nameTranslator: translator);
     })
-    .UseSnakeCaseNamingConvention());
+    );
 
 // Services
 builder.Services.AddHttpClient(); // needed by AuthService for Google token verification
@@ -114,7 +126,30 @@ builder.Services.AddControllers()
     });
 builder.Services.AddSignalR();
 builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
+builder.Services.AddSwaggerGen(c =>
+{
+    c.AddSecurityDefinition("ApiKey", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+    {
+        Name = "X-API-KEY",
+        Type = Microsoft.OpenApi.Models.SecuritySchemeType.ApiKey,
+        In = Microsoft.OpenApi.Models.ParameterLocation.Header,
+        Description = "API Key for the application"
+    });
+    c.AddSecurityRequirement(new Microsoft.OpenApi.Models.OpenApiSecurityRequirement
+    {
+        {
+            new Microsoft.OpenApi.Models.OpenApiSecurityScheme
+            {
+                Reference = new Microsoft.OpenApi.Models.OpenApiReference
+                {
+                    Type = Microsoft.OpenApi.Models.ReferenceType.SecurityScheme,
+                    Id = "ApiKey"
+                }
+            },
+            new List<string>()
+        }
+    });
+});
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<AuthService>();
 builder.Services.AddScoped<UserService>();

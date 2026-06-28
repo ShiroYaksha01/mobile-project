@@ -9,8 +9,30 @@ import '../blocs/products/product_state.dart';
 
 import '../features/auth/login_screen.dart';
 import '../features/auth/register_screen.dart';
+import '../features/landing/landing_screen.dart';
 import '../features/home/home_screen.dart';
-import '../services/product_service.dart';
+import '../features/shop/shop_screen.dart';
+import '../features/shop/product_detail_screen.dart';
+import '../features/shop/artisan_profile_screen.dart';
+import '../features/order/order_review_screen.dart';
+import '../features/order/order_delivery_screen.dart';
+import '../features/order/order_confirm_screen.dart';
+import '../features/saved/favorites_screen.dart';
+import '../features/order/cart_screen.dart';
+import '../features/map/nearby_screen.dart';
+import '../features/profile/profile_screen.dart';
+import '../features/about/about_screen.dart';
+import '../features/help/help_screen.dart';
+
+// Person B screens
+import '../features/explore/explore_screen.dart';
+import '../features/explore/collection_detail_screen.dart';
+import '../features/map/map_screen.dart';
+import '../features/reviews/reviews_screen.dart';
+import '../features/quiz/gift_finder_quiz_screen.dart';
+import '../features/promotions/promotions_screen.dart';
+import '../features/media/media_screen.dart';
+
 import 'user_shell.dart';
 
 class AppRouter {
@@ -19,39 +41,50 @@ class AppRouter {
   AppRouter(this.authBloc);
 
   late final GoRouter router = GoRouter(
-    initialLocation: '/home',
+    initialLocation: '/landing',
     // Refresh the router when auth state changes
     refreshListenable: GoRouterRefreshStream(authBloc.stream),
-    
+
     redirect: (context, state) {
       final authState = authBloc.state;
       final isAuth = authState is AuthAuthenticated;
-      
+      final isInitial = authState is AuthInitial;
+
       final path = state.uri.path;
-      
-      // Define routes that REQUIRE authentication
-      final isProtectedRoute = path.startsWith('/cart') || 
-                               path.startsWith('/chat') || 
-                               path.startsWith('/profile');
 
-      // Define auth-specific routes (login/register)
-      final isAuthRoute = path == '/login' || path == '/register';
-
-      // If user is trying to access a protected route and is not logged in
-      if (isProtectedRoute && !isAuth) {
-        return '/login'; // Redirect to login
+      // On app startup / refresh — always reset to landing, never restore old URL
+      if (isInitial && path != '/landing') {
+        return '/landing';
       }
 
-      // If user is logged in and tries to access login/register, send them to home
-      if (isAuthRoute && isAuth) {
+      // Auth routes — login/register only
+      final isAuthRoute = path == '/login' || path == '/register';
+
+      // Protect non-public routes
+      final isPublicRoute = path == '/landing' ||
+                            path == '/login' ||
+                            path == '/register';
+
+      // If trying to access protected route without login → redirect to login
+      if (!isAuth && !isPublicRoute) {
+        return '/login';
+      }
+
+      // If logged in and on login/register → go to home (landing is always accessible)
+      if (isAuth && isAuthRoute) {
         return '/home';
       }
 
-      // No redirect needed, let them proceed
+      // No redirect needed
       return null;
     },
-    
+
     routes: [
+      // ── Public routes ──────────────────────────────────────
+      GoRoute(
+        path: '/landing',
+        builder: (context, state) => const LandingScreen(),
+      ),
       GoRoute(
         path: '/login',
         builder: (context, state) => const LoginScreen(),
@@ -60,8 +93,88 @@ class AppRouter {
         path: '/register',
         builder: (context, state) => const RegisterScreen(),
       ),
-      
-      // The StatefulShellRoute handles the Bottom Navigation Bar and persists state across tabs
+
+      // ── Standalone pages ───────────────────────────────────
+      GoRoute(
+        path: '/profile',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/settings',
+        builder: (context, state) => const ProfileScreen(),
+      ),
+      GoRoute(
+        path: '/about',
+        builder: (context, state) => const AboutScreen(),
+      ),
+      GoRoute(
+        path: '/help',
+        builder: (context, state) => const HelpScreen(),
+      ),
+
+      // ── Person B: Explore & Discovery routes ──────────────
+      GoRoute(
+        path: '/explore',
+        builder: (context, state) => const ExploreScreen(),
+      ),
+      GoRoute(
+        path: '/collection/:collectionId',
+        builder: (context, state) {
+          final collectionId = state.pathParameters['collectionId']!;
+          return CollectionDetailScreen(collectionId: collectionId);
+        },
+      ),
+      GoRoute(
+        path: '/map',
+        builder: (context, state) => const MapScreen(),
+      ),
+      GoRoute(
+        path: '/reviews/:productId',
+        builder: (context, state) {
+          final productId = state.pathParameters['productId']!;
+          return ReviewsScreen(productId: productId);
+        },
+      ),
+      GoRoute(
+        path: '/quiz',
+        builder: (context, state) => const GiftFinderQuizScreen(),
+      ),
+      GoRoute(
+        path: '/promotions',
+        builder: (context, state) => const PromotionsScreen(),
+      ),
+      GoRoute(
+        path: '/media',
+        builder: (context, state) => const MediaScreen(),
+      ),
+      GoRoute(
+        path: '/product/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ProductDetailScreen(productId: id);
+        },
+      ),
+      GoRoute(
+        path: '/artisan/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ArtisanProfileScreen(artisanId: id);
+        },
+      ),
+      GoRoute(
+        path: '/order/review',
+        builder: (context, state) => const OrderReviewScreen(),
+      ),
+      GoRoute(
+        path: '/order/delivery',
+        builder: (context, state) => const OrderDeliveryScreen(),
+      ),
+      GoRoute(
+        path: '/order/confirm',
+        builder: (context, state) => const OrderConfirmScreen(),
+      ),
+
+      // ── Main tabbed shell (requires login) ─────────────────
       StatefulShellRoute.indexedStack(
         builder: (context, state, navigationShell) {
           return UserShell(navigationShell: navigationShell);
@@ -81,17 +194,12 @@ class AppRouter {
                         );
                       } else if (productState is ProductError) {
                         return Scaffold(
-                          body: Center(child: Text('Error: ${productState.message}')),
+                          body: Center(
+                              child: Text('Error: ${productState.message}')),
                         );
                       } else if (productState is ProductLoaded) {
                         return HomeScreen(
                           products: productState.products,
-                          onFavoriteToggle: (p) {
-                            ProductService.toggleFavorite(p.id);
-                          },
-                          onAddToCart: (p) {
-                            p.cartQty++;
-                          },
                         );
                       }
                       return const Scaffold(
@@ -103,66 +211,69 @@ class AppRouter {
               ),
             ],
           ),
-          
+
           // Branch 2: Shop
           StatefulShellBranch(
             routes: [
               GoRoute(
                 path: '/shop',
-                builder: (context, state) => const Scaffold(
-                  body: Center(child: Text('Shop Screen (Public)')),
-                ),
+                builder: (context, state) {
+                  return BlocBuilder<ProductBloc, ProductState>(
+                    builder: (context, productState) {
+                      if (productState is ProductLoading) {
+                        return const Scaffold(
+                          body: Center(child: CircularProgressIndicator()),
+                        );
+                      } else if (productState is ProductError) {
+                        return Scaffold(
+                          body: Center(
+                              child: Text('Error: ${productState.message}')),
+                        );
+                      } else if (productState is ProductLoaded) {
+                        return ShopScreen(
+                          products: productState.products,
+                        );
+                      }
+                      return const Scaffold(
+                        body: Center(child: Text('No Products available')),
+                      );
+                    },
+                  );
+                },
               ),
             ],
           ),
-          
-          // Branch 3: Map
+
+          // Branch 3: Saved / Favorites
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/map',
-                builder: (context, state) => const Scaffold(
-                  body: Center(child: Text('Map Screen (Public)')),
-                ),
+                path: '/saved',
+                builder: (context, state) => const FavoritesScreen(),
               ),
             ],
           ),
-          
-          // Branch 4: Profile (Protected)
+
+          // Branch 4: Cart
           StatefulShellBranch(
             routes: [
               GoRoute(
-                path: '/profile',
-                builder: (context, state) => Scaffold(
-                  body: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        const Text('Profile Screen (Protected)'),
-                        const SizedBox(height: 24),
-                        ElevatedButton(
-                          onPressed: () {
-                            context.read<AuthBloc>().add(AuthLogoutRequested());
-                          },
-                          child: const Text('Logout'),
-                        )
-                      ],
-                    ),
-                  ),
-                ),
+                path: '/cart',
+                builder: (context, state) => const CartScreen(),
+              ),
+            ],
+          ),
+
+          // Branch 5: Nearby
+          StatefulShellBranch(
+            routes: [
+              GoRoute(
+                path: '/nearby',
+                builder: (context, state) => const NearbyScreen(),
               ),
             ],
           ),
         ],
-      ),
-      
-      // Nested screens that don't need the bottom navigation bar can go out here
-      GoRoute(
-        path: '/cart',
-        builder: (context, state) => const Scaffold(
-          appBar: MyAppBar(title: 'Cart'), // We'll implement MyAppBar later
-          body: Center(child: Text('Cart Screen (Protected)')),
-        ),
       ),
     ],
   );
@@ -184,18 +295,4 @@ class GoRouterRefreshStream extends ChangeNotifier {
     _subscription.cancel();
     super.dispose();
   }
-}
-
-// Dummy MyAppBar to prevent compilation error if uncommented
-class MyAppBar extends StatelessWidget implements PreferredSizeWidget {
-  final String title;
-  const MyAppBar({super.key, required this.title});
-
-  @override
-  Widget build(BuildContext context) {
-    return AppBar(title: Text(title));
-  }
-
-  @override
-  Size get preferredSize => const Size.fromHeight(kToolbarHeight);
 }
