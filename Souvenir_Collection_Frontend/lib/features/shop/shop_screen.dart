@@ -18,6 +18,9 @@ import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_state.dart';
 import '../../blocs/cart/cart_cubit.dart';
 import '../../blocs/favorites/favorites_cubit.dart';
+import '../../models/user_collection.dart';
+import '../../services/user_collection_service.dart';
+import 'collection_detail_screen.dart';
 
 class ShopScreen extends StatefulWidget {
   final List<Product> products;
@@ -45,14 +48,41 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
   List<String> _categories = ['All Crafts'];
   int _cartCount = 0;
   String _sortBy = 'default';
+  List<UserCollection> _userCollections = [];
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
+    _tabController.addListener(() {
+      setState(() {});
+    });
+    _loadUserCollections();
     _loadCategories();
     _loadCartCount();
     _loadFavorites();
+  }
+
+  Future<void> _loadUserCollections() async {
+    final authState = context.read<AuthBloc>().state;
+    if (authState is AuthAuthenticated) {
+      try {
+        final service = context.read<UserCollectionService>();
+        final collections = await service.getUserCollections(authState.user.id);
+        if (!mounted) return;
+        setState(() {
+          _userCollections = collections;
+        });
+      } catch (e) {
+        // ignore
+      }
+    }
+  }
+
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+    });
   }
 
   Future<void> _loadCategories() async {
@@ -418,20 +448,201 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
     return ListView(
       padding: const EdgeInsets.all(20),
       children: [
-        _buildCollectionCard(
-          title: 'Songkran Gift Set',
-          subtitle: 'Celebrate the Khmer New Year',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDnDJ62hmjkoUypeXKmqSz5Oi18r7gNDWYEs6VBrdVKXYsf0md5E0gX00V9LtfdOs2tRn5Yc8Z4UBcxk4_ju79CaENhVaOftErjINGUVm4iLshfWgRRABwmOYZjs61O0EujZtJJA6p9MuEeMBMod1L6Bl2e2BnhMk8cviO4qMKZjFkf02Y9skMpTy5Jl6iIqs7Tt1lKnNo5lspnzvVYJlzG1xEGqiGRch9GWodkSoDSQS9_VI6sDon3rlch8MIipik2j8yer7kdhpo',
+        ElevatedButton.icon(
+          onPressed: _showCreateCollectionDialog,
+          icon: const Icon(Icons.create_new_folder),
+          label: const Text('Create Custom Collection'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: HColors.primary,
+            foregroundColor: HColors.primaryContainer,
+            padding: const EdgeInsets.symmetric(vertical: 16),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+          ),
         ),
-        const SizedBox(height: 16),
-        _buildCollectionCard(
-          title: 'Wedding Gifts',
-          subtitle: 'Heritage pieces for eternal unions',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuBjiDGPRJpT-6iHqOLFC3hjs_EqZxVdnfa9Hp6qe44zeqduqTKCPON3jVBng2vnSfqI9UvUGCCEvQBweW2plKOXe2pLPI5-J9WUMY5XU0VOP9VRgeTFX7M8iCyxBXytiC91u37ulOjoDWDMkPw3OSw4GcEBcFcWl4DvL6N-tU-nC5XfINi_veI9lFVmq1IoBY2zg7BYDd97jSjHTcQSJwN8aUO6PKuHMXeJnkOJhcMgHRJOdExRQR0f-2Y5EOrPQxcL5JgsbQXOoNA',
-        ),
+        const SizedBox(height: 24),
+        if (_userCollections.isNotEmpty) ...[
+          Text('My Collections', style: HText.bodyLg),
+          const SizedBox(height: 16),
+          ..._userCollections.map((c) => _buildUserCollectionCard(c)),
+          const SizedBox(height: 24),
+        ],
       ],
+    );
+  }
+
+  void _showCreateCollectionDialog() {
+    final controller = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('New Collection'),
+        content: TextField(
+          controller: controller,
+          decoration: const InputDecoration(hintText: 'Collection Name'),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () async {
+              if (controller.text.trim().isNotEmpty) {
+                final authState = context.read<AuthBloc>().state;
+                if (authState is AuthAuthenticated) {
+                  try {
+                    final service = context.read<UserCollectionService>();
+                    final newCol = await service.createCollection(authState.user.id, controller.text.trim());
+                    if (!mounted) return;
+                    setState(() {
+                      _userCollections.add(newCol);
+                    });
+                  } catch (e) {}
+                }
+                if (!ctx.mounted) return;
+                Navigator.pop(ctx);
+              }
+            },
+            child: const Text('Create'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showAddProductDialog(UserCollection collection) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            return DraggableScrollableSheet(
+              initialChildSize: 0.7,
+              minChildSize: 0.5,
+              maxChildSize: 0.9,
+              expand: false,
+              builder: (_, controller) {
+                return Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Text('Add Purchased Products to ${collection.name}', style: HText.headlineMd),
+                    ),
+                    Expanded(
+                      child: widget.products.isEmpty
+                          ? const Center(child: Text('No purchased products available.'))
+                          : ListView.builder(
+                              controller: controller,
+                              itemCount: widget.products.length,
+                              itemBuilder: (context, index) {
+                                final product = widget.products[index];
+                                final isAdded = collection.items.any((item) => item.product.id == product.id);
+                                return ListTile(
+                                  leading: ClipRRect(
+                                    borderRadius: BorderRadius.circular(8),
+                                    child: Image.network(
+                                      product.imageUrl,
+                                      width: 50,
+                                      height: 50,
+                                      fit: BoxFit.cover,
+                                      errorBuilder: (context, error, stackTrace) => Container(
+                                        width: 50,
+                                        height: 50,
+                                        color: HColors.surfaceContainerLow,
+                                        child: const Icon(Icons.image_not_supported),
+                                      ),
+                                    ),
+                                  ),
+                                  title: Text(product.name),
+                                  trailing: isAdded
+                                      ? const Icon(Icons.check_circle, color: Colors.green)
+                                      : IconButton(
+                                          icon: const Icon(Icons.add_circle_outline),
+                                          onPressed: () async {
+                                            final authState = context.read<AuthBloc>().state;
+                                            if (authState is AuthAuthenticated) {
+                                              try {
+                                                final service = context.read<UserCollectionService>();
+                                                await service.addOrUpdateItem(authState.user.id, collection.id, product.id, 1);
+                                                if (!mounted) return;
+                                                setState(() {
+                                                  collection.items.add(CollectionItem(product: product));
+                                                });
+                                                setModalState(() {});
+                                              } catch (e) {}
+                                            }
+                                          },
+                                        ),
+                                );
+                              },
+                            ),
+                    ),
+                  ],
+                );
+              },
+            );
+          },
+        );
+      },
+    );
+  }
+
+  Widget _buildUserCollectionCard(UserCollection collection) {
+    return GestureDetector(
+      onTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (ctx) => CollectionDetailScreen(collection: collection),
+          ),
+        ).then((_) => setState(() {}));
+      },
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: HColors.surface,
+          borderRadius: BorderRadius.circular(24),
+          border: Border.all(color: HColors.outlineVariant),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  collection.name,
+                  style: HText.headlineMd,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '${collection.items.length} products',
+                  style: HText.bodyMd.copyWith(color: HColors.onSurfaceVariant),
+                ),
+              ],
+            ),
+            IconButton(
+              icon: const Icon(Icons.add),
+              onPressed: () => _showAddProductDialog(collection),
+              tooltip: 'Add product',
+            ),
+          ],
+        ),
+      ),
     );
   }
 

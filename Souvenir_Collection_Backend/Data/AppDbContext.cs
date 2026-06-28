@@ -27,6 +27,8 @@ public class AppDbContext : DbContext
     public DbSet<ChatMessage> ChatMessages { get; set; }
     public DbSet<QuizQuestion> QuizQuestions { get; set; }
     public DbSet<QuizAnswer> QuizAnswers { get; set; }
+    public DbSet<UserCollection> UserCollections { get; set; }
+    public DbSet<UserCollectionItem> UserCollectionItems { get; set; }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -48,6 +50,8 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<ChatMessage>().ToTable("chat_messages");
         modelBuilder.Entity<QuizQuestion>().ToTable("quiz_questions");
         modelBuilder.Entity<QuizAnswer>().ToTable("quiz_answers");
+        modelBuilder.Entity<UserCollection>().ToTable("user_collections");
+        modelBuilder.Entity<UserCollectionItem>().ToTable("user_collection_items");
         modelBuilder.Entity<QuizAnswer>()
             .HasOne(a => a.QuizQuestion)
             .WithMany(q => q.QuizAnswers)

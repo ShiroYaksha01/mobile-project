@@ -6,11 +6,15 @@ class HeritageAppBar extends StatelessWidget
     implements PreferredSizeWidget {
   final VoidCallback? onMenu;
   final VoidCallback? onSearch;
+  final String? title;
+  final bool showBackButton;
 
   const HeritageAppBar({
     super.key,
     this.onMenu,
     this.onSearch,
+    this.title,
+    this.showBackButton = false,
   });
 
   @override
@@ -23,16 +27,18 @@ class HeritageAppBar extends StatelessWidget
       surfaceTintColor: Colors.transparent,
       elevation: 0,
       scrolledUnderElevation: 0.5,
-      leading: const Padding(
-        padding: EdgeInsets.only(left: 20),
-        child: Icon(
-          Icons.spa_outlined,
-          color: HColors.primary,
-          size: 24,
-        ),
-      ),
+      leading: showBackButton 
+          ? const BackButton(color: HColors.primary)
+          : const Padding(
+              padding: EdgeInsets.only(left: 20),
+              child: Icon(
+                Icons.spa_outlined,
+                color: HColors.primary,
+                size: 24,
+              ),
+            ),
       title: Text(
-        'Crafted in Cambodia',
+        title ?? 'Crafted in Cambodia',
         style: HText.headlineMd.copyWith(
           color: HColors.primary,
           fontSize: 18,

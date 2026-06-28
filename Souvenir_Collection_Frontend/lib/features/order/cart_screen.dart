@@ -299,9 +299,8 @@ class _CartScreenState extends State<CartScreen> {
               height: 56,
               child: ElevatedButton(
                 onPressed: () {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Proceeding to payment...')),
-                  );
+                  if (_cartItems.isEmpty) return;
+                  context.push('/order/delivery');
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: HColors.primary,
