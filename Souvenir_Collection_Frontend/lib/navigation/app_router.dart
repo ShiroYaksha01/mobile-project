@@ -235,8 +235,10 @@ class AppRouter {
                               child: Text('Error: ${productState.message}')),
                         );
                       } else if (productState is ProductLoaded) {
+                        final query = state.uri.queryParameters['query'] ?? '';
                         return ShopScreen(
                           products: productState.products,
+                          initialQuery: query,
                         );
                       }
                       return const Scaffold(

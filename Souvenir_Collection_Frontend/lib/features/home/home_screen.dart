@@ -225,14 +225,7 @@ class _HomeScreenState extends State<HomeScreen> {
       final cat = _categories[_selectedCategory];
       list = list.where((p) => p.category == cat).toList();
     }
-    if (_searchQuery.isNotEmpty) {
-      list = list
-          .where((p) =>
-              p.name.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              p.subtitle.toLowerCase().contains(_searchQuery.toLowerCase()) ||
-              p.category.toLowerCase().contains(_searchQuery.toLowerCase()))
-          .toList();
-    }
+    // Search filtering is now delegated to ShopScreen via navigation
     // Sort
     switch (_sortBy) {
       case 'price_asc': list.sort((a, b) => a.price.compareTo(b.price)); break;
@@ -251,7 +244,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final featured = widget.products.take(4).toList();
-    final showFiltered = _selectedCategory != 0 || _searchQuery.isNotEmpty;
+    final showFiltered = _selectedCategory != 0;
     final displayProducts = showFiltered ? _filteredProducts : featured;
 
     return BlocListener<AuthBloc, AuthState>(
@@ -299,7 +292,7 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(child: const SizedBox(height: 24)),
           SliverToBoxAdapter(
             child: _buildSectionHeader(
-              showFiltered ? 'Filtered Picks' : 'Featured Collections',
+              showFiltered ? 'Filtered Picks' : 'Featured Items',
               showFiltered ? '${displayProducts.length} items' : null,
             ),
           ),
@@ -330,6 +323,11 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: _searchController,
           autofocus: true,
           onChanged: (v) => setState(() => _searchQuery = v),
+          onSubmitted: (v) {
+            if (v.trim().isNotEmpty) {
+              context.go('/shop?query=${Uri.encodeComponent(v.trim())}');
+            }
+          },
           decoration: InputDecoration(
             hintText: 'Search products...',
             hintStyle: HText.bodyMd.copyWith(color: HColors.outline),
@@ -400,7 +398,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 Text('Festive Special', style: HText.labelLg.copyWith(color: HColors.onSecondaryContainer, fontWeight: FontWeight.bold)),
                 const SizedBox(height: 2),
-                Text('Use code KHMER20 for 20% off all silk items.', style: HText.labelSm.copyWith(color: HColors.onSecondaryContainer.withValues(alpha: 0.8))),
+                Text('Use code group2 for 10% off all items.', style: HText.labelSm.copyWith(color: HColors.onSecondaryContainer.withValues(alpha: 0.8))),
               ],
             ),
           ),
