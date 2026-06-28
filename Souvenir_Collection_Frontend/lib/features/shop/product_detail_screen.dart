@@ -364,9 +364,9 @@ final _categoryMeta = {
 };
 
 const _fallbackIcons = [
-  _Meta(const Color(0xFF8B3A2B), Icons.spa_outlined),
-  _Meta(const Color(0xFFD4AF37), Icons.auto_awesome),
-  _Meta(const Color(0xFF5A2117), Icons.category_outlined),
-  _Meta(const Color(0xFFB75D4E), Icons.workspaces_outlined),
-  _Meta(const Color(0xFF997A00), Icons.stars_outlined),
+  _Meta(Color(0xFF8B3A2B), Icons.spa_outlined),
+  _Meta(Color(0xFFD4AF37), Icons.auto_awesome),
+  _Meta(Color(0xFF5A2117), Icons.category_outlined),
+  _Meta(Color(0xFFB75D4E), Icons.workspaces_outlined),
+  _Meta(Color(0xFF997A00), Icons.stars_outlined),
 ];

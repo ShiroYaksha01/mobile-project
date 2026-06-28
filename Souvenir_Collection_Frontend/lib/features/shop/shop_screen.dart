@@ -24,12 +24,14 @@ import 'collection_detail_screen.dart';
 
 class ShopScreen extends StatefulWidget {
   final List<Product> products;
+  final String initialQuery;
   final void Function(Product)? onFavoriteToggle;
   final void Function(Product)? onAddToCart;
 
   const ShopScreen({
     super.key,
     required this.products,
+    this.initialQuery = '',
     this.onFavoriteToggle,
     this.onAddToCart,
   });
@@ -41,18 +43,20 @@ class ShopScreen extends StatefulWidget {
 class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _selectedCategory = 0;
-  int _navIndex = 1;
+  final int _navIndex = 1;
   String _searchQuery = '';
   final _searchController = TextEditingController();
 
   List<String> _categories = ['All Crafts'];
-  int _cartCount = 0;
+
   String _sortBy = 'default';
   List<UserCollection> _userCollections = [];
 
   @override
   void initState() {
     super.initState();
+    _searchQuery = widget.initialQuery;
+    _searchController.text = widget.initialQuery;
     _tabController = TabController(length: 3, vsync: this);
     _tabController.addListener(() {
       setState(() {});
@@ -107,7 +111,6 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
         final count = await orderService.getCartCount(authState.user.id);
         if (mounted) {
           context.read<CartCubit>().setCount(count);
-          setState(() => _cartCount = count);
         }
       }
     } catch (_) {}
@@ -360,52 +363,77 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
             ),
           ),
 
+          // Featured Products Header
+          if (_searchQuery.isEmpty && _selectedCategory == 0)
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text('Featured Items', style: HText.headlineMd.copyWith(color: HColors.primary)),
+              ),
+            ),
+
           // Featured Products Scroll (Horizontal)
-          SizedBox(
-            height: 320,
-            child: _sortedProducts.isEmpty
-                ? Center(
-                    child: Text(
-                      'No products found',
-                      style: HText.bodyMd,
-                    ),
-                  )
-                : ListView.builder(
-                    scrollDirection: Axis.horizontal,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                    itemCount: _sortedProducts.take(3).length,
-                    itemBuilder: (context, index) {
-                      final product = _sortedProducts[index];
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 16),
-                        child: SizedBox(
-                          width: 200,
-                          child: ProductCard(
-                            id: product.id,
-                            name: product.name,
-                            subtitle: product.subtitle,
-                            imageUrl: product.imageUrl,
-                            price: product.price,
-                            badge: product.badge,
-                            isFavorite: favState.favoriteIds.contains(product.id),
-                            category: product.category,
-                            onFavoriteToggle: () {
-                              _handleFavoriteToggle(product);
-                            },
-                            onAddToCart: () {
-                              _handleAddToCart(product);
-                            },
-                            onTap: () => context.push('/product/${product.id}'),
+          if (_searchQuery.isEmpty && _selectedCategory == 0)
+            SizedBox(
+              height: 320,
+              child: _sortedProducts.isEmpty
+                  ? Center(
+                      child: Text(
+                        'No products found',
+                        style: HText.bodyMd,
+                      ),
+                    )
+                  : ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                      itemCount: _sortedProducts.take(3).length,
+                      itemBuilder: (context, index) {
+                        final product = _sortedProducts[index];
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 16),
+                          child: SizedBox(
+                            width: 200,
+                            child: ProductCard(
+                              id: product.id,
+                              name: product.name,
+                              subtitle: product.subtitle,
+                              imageUrl: product.imageUrl,
+                              price: product.price,
+                              badge: product.badge,
+                              isFavorite: favState.favoriteIds.contains(product.id),
+                              category: product.category,
+                              onFavoriteToggle: () {
+                                _handleFavoriteToggle(product);
+                              },
+                              onAddToCart: () {
+                                _handleAddToCart(product);
+                              },
+                              onTap: () => context.push('/product/${product.id}'),
+                            ),
                           ),
-                        ),
-                      );
-                    },
-                  ),
+                        );
+                      },
+                    ),
+            ),
+
+          // Grid Products Header
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                (_searchQuery.isNotEmpty || _selectedCategory != 0)
+                    ? 'Search Results'
+                    : 'All Items',
+                style: HText.headlineMd.copyWith(color: HColors.primary),
+              ),
+            ),
           ),
 
           // Grid Products
           Padding(
-            padding: const EdgeInsets.all(20),
+            padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
             child: GridView.builder(
               shrinkWrap: true,
               physics: const NeverScrollableScrollPhysics(),

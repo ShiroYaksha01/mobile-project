@@ -1,4 +1,3 @@
-import 'dart:math';
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
@@ -10,6 +9,7 @@ import '../../core/widgets/bottom_nav.dart';
 import '../../core/widgets/sidebar.dart';
 import '../../models/nearby_shop.dart';
 import '../../services/map_service.dart';
+import '../../blocs/cart/cart_cubit.dart';
 
 class NearbyScreen extends StatefulWidget {
   const NearbyScreen({super.key});
@@ -45,18 +45,21 @@ class _NearbyScreenState extends State<NearbyScreen> {
       backgroundColor: HColors.background,
       appBar: const HeritageAppBar(),
       endDrawer: const AppSidebar(currentIndex: -1),
-      bottomNavigationBar: HeritageBottomNav(
-        currentIndex: _navIndex,
-        onTap: (i) {
-          if (i == _navIndex) return;
-          if (i == 0) context.go('/home');
-          if (i == 1) context.go('/shop');
-          if (i == 2) context.go('/saved');
-          if (i == 3) context.go('/cart');
-          if (i == 4) {
-            // Already here
-          }
-        },
+      bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
+        builder: (context, cartState) => HeritageBottomNav(
+          currentIndex: _navIndex,
+          cartCount: cartState.cartCount,
+          onTap: (i) {
+            if (i == _navIndex) return;
+            if (i == 0) context.go('/home');
+            if (i == 1) context.go('/shop');
+            if (i == 2) context.go('/saved');
+            if (i == 3) context.go('/cart');
+            if (i == 4) {
+              // Already here
+            }
+          },
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
