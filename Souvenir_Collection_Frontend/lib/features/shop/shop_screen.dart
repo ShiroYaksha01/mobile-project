@@ -12,6 +12,8 @@ import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../../services/favorites_service.dart';
 import '../../services/order_service.dart';
+import '../../blocs/artisans/artisan_bloc.dart';
+import '../../blocs/artisans/artisan_state.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_state.dart';
 import '../../blocs/cart/cart_cubit.dart';
@@ -506,33 +508,57 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
   }
 
   Widget _buildArtisansTab() {
-    return ListView.builder(
-      padding: const EdgeInsets.all(20),
-      itemCount: 5,
-      itemBuilder: (context, index) {
-        return _buildArtisanCard(
-          name: 'Vannak Som',
-          specialty: 'Silk Weaver • Siem Reap',
-          rating: 4.9,
-          badge: 'MASTER',
-          imageUrl:
-              'https://lh3.googleusercontent.com/aida-public/AB6AXuDhv-CsxpxLLhNljZA1mjnE1PhMFm9yVDmjgrp_zSWVYXL4_9-CoLevgbk48ap5SWZyqcli0ko3RWGCFGi0bOjPaKZ_YuK07nOZAqgEhQn2JNuHJD6PL6sXgmmyrIJpiqziZusexf1Mk6sY6QXPxV7PGjK2EguEQJru8E5pNL7rFbCNxs0t9TbDCfu_dV5YxDtU7CvrAn1mUI_hotyhA97ROD4uzA1hUNfnhKsSCs5xYLW3JhI5VMfLim9PT7Vg4maWQlHhWAR01VI',
-        );
+    return BlocBuilder<ArtisanBloc, ArtisanState>(
+      builder: (context, state) {
+        if (state is ArtisanLoading) {
+          return const Center(child: CircularProgressIndicator());
+        } else if (state is ArtisanLoaded) {
+          if (state.artisans.isEmpty) {
+            return const Center(child: Text('No artisans found.'));
+          }
+          return ListView.builder(
+            padding: const EdgeInsets.all(20),
+            itemCount: state.artisans.length,
+            itemBuilder: (context, index) {
+              final artisan = state.artisans[index];
+              return _buildArtisanCard(
+                context: context,
+                id: artisan.id,
+                name: artisan.name,
+                specialty: artisan.craft.isNotEmpty 
+                    ? '${artisan.craft}${artisan.region.isNotEmpty ? ' • ${artisan.region}' : ''}' 
+                    : artisan.region,
+                rating: 4.9,
+                badge: artisan.isVerified ? 'VERIFIED' : 'ARTISAN',
+                imageUrl: artisan.imageUrl.isNotEmpty
+                    ? artisan.imageUrl
+                    : 'https://images.unsplash.com/photo-1544928147-79a2dbc1f389?w=800&q=80',
+              );
+            },
+          );
+        } else if (state is ArtisanError) {
+          return Center(child: Text('Error: ${state.message}'));
+        }
+        return const Center(child: Text('Please load artisans.'));
       },
     );
   }
 
   Widget _buildArtisanCard({
+    required BuildContext context,
+    required String id,
     required String name,
     required String specialty,
     required double rating,
     required String badge,
     required String imageUrl,
   }) {
-    return Container(
-      margin: const EdgeInsets.only(bottom: 16),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
+    return GestureDetector(
+      onTap: () => context.push('/artisan/$id'),
+      child: Container(
+        margin: const EdgeInsets.only(bottom: 16),
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
         color: HColors.surface,
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
@@ -632,6 +658,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
           ),
         ],
       ),
+    ),
     );
   }
 

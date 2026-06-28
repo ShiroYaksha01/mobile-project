@@ -9,7 +9,7 @@ This project is a full-stack application for browsing and ordering handmade gift
 - **UI Design:** Material 3, Festive theme (Warm earth tones + Gold accents), Khmer motifs.
 - **State Management:** BLoC (as evidenced by `lib/blocs` structure).
 - **Navigation:** `go_router`
-- **Local Storage:** `shared_preferences` (for favorites).
+- **Storage Strategy:** Backend-synced Favorites via Supabase, with local caching via `shared_preferences`.
 - **Maps:** `flutter_map` with dynamic markers fetched from the backend (no hardcoded locations).
 - **Assets:** Core branding/motifs as bundled assets; dynamic content (products, artisans, reviews) via `cached_network_image` from backend URLs.
 
@@ -50,7 +50,7 @@ This project is a full-stack application for browsing and ordering handmade gift
 ## 📱 Common Screen Specifications
 - **Home:** Hero banner/carousel, categories grid, featured items, search bar, promotions strip.
 - **Product Detail:** Image gallery (PageView), title, price/rating, description, specs/options, "Add to favorite", primary CTA.
-- **Favorites:** Saved items list, swipe-to-remove, persisted via shared_preferences.
+- **Favorites:** Saved items list, swipe-to-remove, tied to user account and persisted to the backend (Supabase).
 - **Map / Locations:** `flutter_map` with dynamic markers, bottom sheet with branch info, "Get directions".
 - **Nearby:** Branch list sorted by mock distance, filter chips (open now, distance, rating).
 - **Promotions & Coupons:** Coupon cards with code, expiry, "Copy code", "Use now".
