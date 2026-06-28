@@ -363,6 +363,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                             onAddToCart: () {
                               _handleAddToCart(product);
                             },
+                            onTap: () => context.push('/product/${product.id}'),
                           ),
                         ),
                       );
@@ -400,6 +401,7 @@ class _ShopScreenState extends State<ShopScreen> with SingleTickerProviderStateM
                   onAddToCart: () {
                     _handleAddToCart(product);
                   },
+                  onTap: () => context.push('/product/${product.id}'),
                 );
               },
             ),

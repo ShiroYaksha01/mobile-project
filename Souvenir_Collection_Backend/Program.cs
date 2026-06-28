@@ -30,6 +30,18 @@ builder.Services.AddSingleton(provider =>
 
         client.InitializeAsync().Wait();
     Console.WriteLine("Connected to Supabase!");
+
+    // Ensure "media" storage bucket exists
+    try
+    {
+        client.Storage.CreateBucket("media", new Supabase.Storage.BucketUpsertOptions { Public = true });
+        Console.WriteLine("Storage bucket 'media' created successfully.");
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine($"Note: Could not create 'media' bucket (may already exist): {ex.Message}");
+    }
+
     return client;
 
     }catch(Exception ex){

@@ -12,12 +12,14 @@ import '../../core/widgets/category_chip.dart';
 import '../../core/widgets/product_card.dart';
 import '../../core/widgets/sidebar.dart';
 import '../../models/artisan.dart';
+import '../../models/collection.dart';
 import '../../models/nearby_shop.dart';
 import '../../models/product.dart';
 import '../../services/product_service.dart';
 import '../../services/favorites_service.dart';
 import '../../services/order_service.dart';
 import '../../services/map_service.dart';
+import '../../services/collection_service.dart';
 import '../../blocs/artisans/artisan_bloc.dart';
 import '../../blocs/artisans/artisan_state.dart';
 import '../../blocs/auth/auth_bloc.dart';
@@ -51,8 +53,10 @@ class _HomeScreenState extends State<HomeScreen> {
   // Data from API
   List<String> _categories = ['All'];
   List<NearbyShop> _nearbyShops = [];
+  List<Collection> _collections = [];
   bool _categoriesLoading = true;
   bool _nearbyLoading = true;
+  bool _collectionsLoading = true;
   int _cartCount = 0;
   String _sortBy = 'default'; // 'default', 'price_asc', 'price_desc', 'name'
 
@@ -61,6 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     _loadCategories();
     _loadNearbyShops();
+    _loadCollections();
     _loadCartCount();
     _loadFavorites();
   }
@@ -97,6 +102,23 @@ class _HomeScreenState extends State<HomeScreen> {
     } catch (_) {
       if (mounted) {
         setState(() => _nearbyLoading = false);
+      }
+    }
+  }
+
+  Future<void> _loadCollections() async {
+    try {
+      final collectionService = context.read<CollectionService>();
+      final collections = await collectionService.getCollections();
+      if (mounted) {
+        setState(() {
+          _collections = collections;
+          _collectionsLoading = false;
+        });
+      }
+    } catch (_) {
+      if (mounted) {
+        setState(() => _collectionsLoading = false);
       }
     }
   }
@@ -285,6 +307,8 @@ class _HomeScreenState extends State<HomeScreen> {
           SliverToBoxAdapter(child: const SizedBox(height: 14)),
           SliverToBoxAdapter(child: _buildProductRow(displayProducts)),
           const SliverToBoxAdapter(child: SizedBox(height: 36)),
+          SliverToBoxAdapter(child: _buildCollectionsSection()),
+          const SliverToBoxAdapter(child: SizedBox(height: 36)),
           SliverToBoxAdapter(child: _buildArtisanSection()),
           const SliverToBoxAdapter(child: SizedBox(height: 36)),
           SliverToBoxAdapter(child: _buildStoryCard()),
@@ -462,12 +486,78 @@ class _HomeScreenState extends State<HomeScreen> {
                   badge: p.badge, isFavorite: isFav, category: p.category,
                   onFavoriteToggle: () => _handleFavoriteToggle(p),
                   onAddToCart: () => _handleAddToCart(p),
+                  onTap: () => context.push('/product/${p.id}'),
                 ),
               );
             },
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCollectionsSection() {
+    if (_collectionsLoading && _collections.isEmpty) {
+      return const SizedBox(
+        height: 200,
+        child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
+      );
+    }
+    if (_collections.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 20),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Curated Collections',
+                      style: HText.headlineMd.copyWith(color: HColors.primary)),
+                  const SizedBox(height: 2),
+                  Text('Discover Cambodian heritage',
+                      style: HText.labelSm.copyWith(color: HColors.outline)),
+                ],
+              ),
+              GestureDetector(
+                onTap: () => context.push('/explore'),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('View All',
+                        style: HText.labelSm.copyWith(
+                            color: HColors.primary,
+                            fontWeight: FontWeight.w600)),
+                    const Icon(Icons.arrow_forward_ios,
+                        size: 12, color: HColors.primary),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 14),
+        SizedBox(
+          height: 240,
+          child: ListView.separated(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            itemCount: _collections.length,
+            separatorBuilder: (_, _) => const SizedBox(width: 14),
+            itemBuilder: (ctx, i) {
+              final c = _collections[i];
+              return _CollectionCard(collection: c);
+            },
+          ),
+        ),
+      ],
     );
   }
 
@@ -832,6 +922,116 @@ class _ArtisanAvatar extends StatelessWidget {
             overflow: TextOverflow.ellipsis,
           ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── collection card ────────────────────────────────────────────────
+class _CollectionCard extends StatelessWidget {
+  final Collection collection;
+  const _CollectionCard({required this.collection});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: () => context.push('/collection/${collection.id}'),
+      child: Container(
+        width: 180,
+        decoration: BoxDecoration(
+          color: HColors.surfaceContainerLowest,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: const Color(0xFF2E2E2E).withValues(alpha: 0.06),
+              blurRadius: 14,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        clipBehavior: Clip.hardEdge,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Expanded(
+              flex: 3,
+              child: collection.image.isNotEmpty
+                  ? Image.network(collection.image, fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(
+                                begin: Alignment.topLeft,
+                                end: Alignment.bottomRight,
+                                colors: [
+                                  HColors.primary.withValues(alpha: 0.6),
+                                  HColors.primary.withValues(alpha: 0.25),
+                                ],
+                              ),
+                            ),
+                            child: const Center(
+                              child: Icon(Icons.museum_outlined,
+                                  size: 36, color: Colors.white70),
+                            ),
+                          ))
+                  : Container(
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            HColors.primary.withValues(alpha: 0.6),
+                            HColors.primary.withValues(alpha: 0.25),
+                          ],
+                        ),
+                      ),
+                      child: const Center(
+                        child: Icon(Icons.museum_outlined,
+                            size: 36, color: Colors.white70),
+                      ),
+                    ),
+            ),
+            Expanded(
+              flex: 2,
+              child: Padding(
+                padding: const EdgeInsets.all(10),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      collection.title,
+                      style: HText.labelLg.copyWith(color: HColors.onSurface),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      collection.description,
+                      style: HText.labelSm.copyWith(color: HColors.outline),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const Spacer(),
+                    if (collection.type.isNotEmpty)
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: HColors.primaryContainer
+                              .withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Text(
+                          collection.type,
+                          style: HText.labelSm.copyWith(
+                              color: HColors.primary, fontSize: 10),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
