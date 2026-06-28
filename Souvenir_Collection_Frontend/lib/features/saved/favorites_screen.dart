@@ -109,15 +109,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               backgroundColor: HColors.background,
               appBar: const HeritageAppBar(),
               endDrawer: const AppSidebar(currentIndex: -1),
-              bottomNavigationBar: HeritageBottomNav(
-                currentIndex: _navIndex,
-                onTap: (i) {
-                  if (i == _navIndex) return;
-                  if (i == 0) context.go('/home');
-                  if (i == 1) context.go('/shop');
-                  if (i == 3) context.go('/cart');
-                  if (i == 4) context.go('/nearby');
-                },
+              bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
+                builder: (context, cartState) => HeritageBottomNav(
+                  currentIndex: _navIndex,
+                  cartCount: cartState.cartCount,
+                  onTap: (i) {
+                    if (i == _navIndex) return;
+                    if (i == 0) context.go('/home');
+                    if (i == 1) context.go('/shop');
+                    if (i == 3) context.go('/cart');
+                    if (i == 4) context.go('/nearby');
+                  },
+                ),
               ),
               body: _favorites.isEmpty
                   ? const _EmptyFavorites()

@@ -102,6 +102,7 @@ builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
         options.JsonSerializerOptions.Converters.Add(new System.Text.Json.Serialization.JsonStringEnumConverter());
+        options.JsonSerializerOptions.ReferenceHandler = System.Text.Json.Serialization.ReferenceHandler.IgnoreCycles;
         var baseModelProperties = typeof(Supabase.Postgrest.Models.BaseModel).GetProperties().Select(p => p.Name.ToLowerInvariant()).ToHashSet();
         options.JsonSerializerOptions.TypeInfoResolver = new DefaultJsonTypeInfoResolver
         {
@@ -194,6 +195,13 @@ using (var scope = app.Services.CreateScope())
                 product_id uuid REFERENCES products(id),
                 quantity integer NOT NULL DEFAULT 1
             );
+        ");
+        await context.Database.ExecuteSqlRawAsync(@"
+            INSERT INTO promotions (id, title, code, description, image, discount_type, discount, usage_limit, usage_count, status, start_date, end_date, created_at, updated_at)
+            SELECT gen_random_uuid(), 'Group 2 Permanent Promo', 'group2', 'Permanent 10% discount for Group 2', '', 'Percentage', 10.00, 2147483647, 0, 'Active', '2000-01-01', '2099-12-31', NOW(), NOW()
+            WHERE NOT EXISTS (SELECT 1 FROM promotions WHERE code = 'group2');
+            
+            UPDATE promotions SET usage_limit = 2147483647, end_date = '2099-12-31', status = 'Active' WHERE code = 'group2';
         ");
         Console.WriteLine("Database schema altered successfully (user_id and collection_id verified, constraints and display_orders adjusted, user collections created).");
 

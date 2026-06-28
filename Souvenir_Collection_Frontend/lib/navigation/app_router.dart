@@ -17,6 +17,7 @@ import '../features/shop/artisan_profile_screen.dart';
 import '../features/order/order_review_screen.dart';
 import '../features/order/order_delivery_screen.dart';
 import '../features/order/order_confirm_screen.dart';
+import '../features/order/order_history_screen.dart';
 import '../features/saved/favorites_screen.dart';
 import '../features/order/cart_screen.dart';
 import '../features/map/nearby_screen.dart';
@@ -173,6 +174,10 @@ class AppRouter {
         path: '/order/confirm',
         builder: (context, state) => const OrderConfirmScreen(),
       ),
+      GoRoute(
+        path: '/orders',
+        builder: (context, state) => const OrderHistoryScreen(),
+      ),
 
       // ── Main tabbed shell (requires login) ─────────────────
       StatefulShellRoute.indexedStack(
@@ -230,8 +235,10 @@ class AppRouter {
                               child: Text('Error: ${productState.message}')),
                         );
                       } else if (productState is ProductLoaded) {
+                        final query = state.uri.queryParameters['query'] ?? '';
                         return ShopScreen(
                           products: productState.products,
+                          initialQuery: query,
                         );
                       }
                       return const Scaffold(

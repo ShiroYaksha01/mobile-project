@@ -77,7 +77,7 @@ namespace Souvenir_Collection_Backend.Services
                 PaymentMethod   = request.PaymentMethod,
                 DeliveryAddress = request.DeliveryAddress,
                 DeliveryMessage = request.DeliveryMessage,
-                DeliveryDate    = request.DeliveryDate,
+                DeliveryDate    = request.DeliveryDate.ToUniversalTime(),
                 PromotionId     = request.PromotionId,
                 CreatedAt       = DateTime.UtcNow,
                 UpdatedAt       = DateTime.UtcNow

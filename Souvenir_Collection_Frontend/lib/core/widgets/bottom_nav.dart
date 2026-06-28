@@ -157,12 +157,19 @@ class _CartNavItem extends StatelessWidget {
                 active
                     ? Icons.shopping_bag
                     : Icons.shopping_bag_outlined,
+                color: active
+                    ? HColors.primary
+                    : HColors.onSurfaceVariant,
               ),
             ),
             const SizedBox(height: 4),
             Text(
               'Cart',
-              style: HText.labelSm,
+              style: HText.labelSm.copyWith(
+                color: active
+                    ? HColors.primary
+                    : HColors.onSurfaceVariant,
+              ),
             ),
           ],
         ),
