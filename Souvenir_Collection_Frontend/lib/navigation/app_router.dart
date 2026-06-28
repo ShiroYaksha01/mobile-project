@@ -12,6 +12,11 @@ import '../features/auth/register_screen.dart';
 import '../features/landing/landing_screen.dart';
 import '../features/home/home_screen.dart';
 import '../features/shop/shop_screen.dart';
+import '../features/shop/product_detail_screen.dart';
+import '../features/shop/artisan_profile_screen.dart';
+import '../features/order/order_review_screen.dart';
+import '../features/order/order_delivery_screen.dart';
+import '../features/order/order_confirm_screen.dart';
 import '../features/saved/favorites_screen.dart';
 import '../features/order/cart_screen.dart';
 import '../features/map/nearby_screen.dart';
@@ -141,6 +146,32 @@ class AppRouter {
       GoRoute(
         path: '/media',
         builder: (context, state) => const MediaScreen(),
+      ),
+      GoRoute(
+        path: '/product/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ProductDetailScreen(productId: id);
+        },
+      ),
+      GoRoute(
+        path: '/artisan/:id',
+        builder: (context, state) {
+          final id = state.pathParameters['id']!;
+          return ArtisanProfileScreen(artisanId: id);
+        },
+      ),
+      GoRoute(
+        path: '/order/review',
+        builder: (context, state) => const OrderReviewScreen(),
+      ),
+      GoRoute(
+        path: '/order/delivery',
+        builder: (context, state) => const OrderDeliveryScreen(),
+      ),
+      GoRoute(
+        path: '/order/confirm',
+        builder: (context, state) => const OrderConfirmScreen(),
       ),
 
       // ── Main tabbed shell (requires login) ─────────────────

@@ -87,12 +87,12 @@ class _GiftFinderQuizScreenState extends State<GiftFinderQuizScreen> {
     final collectionService = context.read<CollectionService>();
     List<Product> pool = [];
     try {
-      final collections = await collectionService.getAllCollections();
+      final collections = await collectionService.getCollections();
       if (collections.isNotEmpty) {
         // Pick a random collection
         collections.shuffle(Random(tags.hashCode));
         final col = collections.first;
-        final id = col['id']?.toString() ?? '';
+        final id = col.id;
         if (id.isNotEmpty) {
           pool = await collectionService.getCollectionProducts(id);
         }

@@ -87,6 +87,7 @@ namespace Souvenir_Collection_Backend.Services
 
                                 return new RegisterResponse
                                 {
+                                    Id           = existingUser.Id,
                                     AccessToken  = _tokenService.GenerateToken(existingUser),
                                     RefreshToken = signInResponse.RefreshToken ?? "",
                                     Name         = existingUser.Name,
@@ -148,6 +149,7 @@ namespace Souvenir_Collection_Backend.Services
 
             return new RegisterResponse
             {
+                Id           = user.Id,
                 AccessToken  = _tokenService.GenerateToken(user),
                 RefreshToken = response.RefreshToken ?? "",
                 Name         = user.Name,
@@ -187,6 +189,7 @@ namespace Souvenir_Collection_Backend.Services
 
             return new LoginResponse
             {
+                Id           = user.Id,
                 AccessToken  = _tokenService.GenerateToken(user),
                 RefreshToken = response.RefreshToken ?? "",
                 Name         = user.Name,
@@ -209,6 +212,7 @@ namespace Souvenir_Collection_Backend.Services
 
             return new LoginResponse
             {
+                Id           = user.Id,
                 AccessToken  = _tokenService.GenerateToken(user),
                 RefreshToken = string.Empty,
                 Name         = user.Name,
@@ -252,6 +256,7 @@ namespace Souvenir_Collection_Backend.Services
 
             return new RegisterResponse
             {
+                Id           = user.Id,
                 AccessToken  = _tokenService.GenerateToken(user),
                 RefreshToken = string.Empty,
                 Name         = user.Name,
@@ -316,6 +321,7 @@ namespace Souvenir_Collection_Backend.Services
 
             return new LoginResponse
             {
+                Id           = user.Id,
                 AccessToken  = _tokenService.GenerateToken(user),
                 RefreshToken = response.RefreshToken ?? "",
                 Name         = user.Name,
