@@ -6,11 +6,9 @@ import '../../core/theme/app_colors.dart';
 import '../../core/theme/app_text_styles.dart';
 import '../../core/widgets/app_bar.dart';
 import '../../core/widgets/bottom_nav.dart';
-import '../../core/widgets/gold_button.dart';
 import '../../core/widgets/sidebar.dart';
 import '../../models/product.dart';
 import '../../services/order_service.dart';
-import '../../services/promotion_service.dart';
 import '../../blocs/auth/auth_bloc.dart';
 import '../../blocs/auth/auth_state.dart';
 import '../../blocs/cart/cart_cubit.dart';
@@ -51,7 +49,10 @@ class _CartScreenState extends State<CartScreen> {
       if (mounted) {
         setState(() { _cartItems = items; _isLoading = false; });
         final totalQty = items.fold<int>(0, (sum, item) => sum + item.cartQty);
-        context.read<CartCubit>().setCount(totalQty);
+        final currentCount = context.read<CartCubit>().state.cartCount;
+        if (currentCount != totalQty) {
+          context.read<CartCubit>().setCount(totalQty);
+        }
       }
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
@@ -92,94 +93,107 @@ class _CartScreenState extends State<CartScreen> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isLoading) {
-      return Scaffold(
-        backgroundColor: HColors.background,
-        appBar: const HeritageAppBar(),
-        body: const Center(child: CircularProgressIndicator()),
-      );
-    }
-
     final total = _cartItems.fold<double>(
       0,
       (sum, item) => sum + item.price * item.cartQty,
     );
 
-    return Scaffold(
-      backgroundColor: HColors.background,
-      appBar: const HeritageAppBar(),
-      endDrawer: const AppSidebar(currentIndex: -1),
-      bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
-        builder: (context, cartState) => HeritageBottomNav(
-          currentIndex: _navIndex,
-          cartCount: cartState.cartCount,
-          onTap: (i) {
-            if (i == _navIndex) return;
-            if (i == 0) context.go('/home');
-            if (i == 1) context.go('/shop');
-            if (i == 2) context.go('/saved');
-            if (i == 3) {
-              // Already here
-            }
-            if (i == 4) context.go('/nearby');
+    return MultiBlocListener(
+      listeners: [
+        BlocListener<CartCubit, CartState>(
+          listener: (context, state) {
+            _loadCart();
           },
         ),
-      ),
-      body: _cartItems.isEmpty
-          ? const _EmptyCart()
-          : Column(
-              children: [
-                Expanded(
-                  child: CustomScrollView(
-                    slivers: [
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                'My Cart',
-                                style: HText.headlineLg,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                '${_cartItems.fold<int>(0, (sum, item) => sum + item.cartQty)} handcrafted pieces selected',
-                                style: HText.bodyMd.copyWith(
-                                  color: HColors.onSurfaceVariant,
+        BlocListener<AuthBloc, AuthState>(
+          listener: (context, state) {
+            if (state is AuthAuthenticated) {
+              _loadCart();
+            } else if (state is AuthUnauthenticated) {
+              setState(() {
+                _cartItems = [];
+              });
+            }
+          },
+        ),
+      ],
+      child: Scaffold(
+        backgroundColor: HColors.background,
+        appBar: const HeritageAppBar(),
+        endDrawer: const AppSidebar(currentIndex: -1),
+        bottomNavigationBar: BlocBuilder<CartCubit, CartState>(
+          builder: (context, cartState) => HeritageBottomNav(
+            currentIndex: _navIndex,
+            cartCount: cartState.cartCount,
+            onTap: (i) {
+              if (i == _navIndex) return;
+              if (i == 0) context.go('/home');
+              if (i == 1) context.go('/shop');
+              if (i == 2) context.go('/saved');
+              if (i == 3) {
+                // Already here
+              }
+              if (i == 4) context.go('/nearby');
+            },
+          ),
+        ),
+        body: _isLoading
+            ? const Center(child: CircularProgressIndicator())
+            : _cartItems.isEmpty
+                ? const _EmptyCart()
+                : Column(
+                    children: [
+                      Expanded(
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverToBoxAdapter(
+                              child: Padding(
+                                padding: const EdgeInsets.fromLTRB(20, 20, 20, 12),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      'My Cart',
+                                      style: HText.headlineLg,
+                                    ),
+                                    const SizedBox(height: 6),
+                                    Text(
+                                      '${_cartItems.fold<int>(0, (sum, item) => sum + item.cartQty)} handcrafted pieces selected',
+                                      style: HText.bodyMd.copyWith(
+                                        color: HColors.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
-                            ],
-                          ),
+                            ),
+                            SliverPadding(
+                              padding: const EdgeInsets.symmetric(horizontal: 20),
+                              sliver: SliverList(
+                                delegate: SliverChildBuilderDelegate(
+                                  (context, index) {
+                                    final product = _cartItems[index];
+                                    return _CartItemCard(
+                                      product: product,
+                                      onUpdate: () => setState(() {}),
+                                      onIncrement: () => _updateQuantity(product, 1),
+                                      onDecrement: () => _updateQuantity(product, -1),
+                                    );
+                                  },
+                                  childCount: _cartItems.length,
+                                ),
+                              ),
+                            ),
+                            const SliverToBoxAdapter(
+                              child: SizedBox(height: 24),
+                            ),
+                          ],
                         ),
                       ),
-                      SliverPadding(
-                        padding: const EdgeInsets.symmetric(horizontal: 20),
-                        sliver: SliverList(
-                          delegate: SliverChildBuilderDelegate(
-                            (context, index) {
-                              final product = _cartItems[index];
-                              return _CartItemCard(
-                                product: product,
-                                onUpdate: () => setState(() {}),
-                                onIncrement: () => _updateQuantity(product, 1),
-                                onDecrement: () => _updateQuantity(product, -1),
-                              );
-                            },
-                            childCount: _cartItems.length,
-                          ),
-                        ),
-                      ),
-
-                      const SliverToBoxAdapter(
-                        child: SizedBox(height: 24),
-                      ),
+                      _buildSummary(total),
                     ],
                   ),
-                ),
-                _buildSummary(total),
-              ],
-            ),
+      ),
     );
   }
 
